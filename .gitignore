@@ -1,0 +1,5 @@
+node_modules/
+auth.json
+start.sh
+vars.json
+package-lock.json
