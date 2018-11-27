@@ -3,3 +3,4 @@ auth.json
 start.sh
 vars.json
 package-lock.json
+package.json
