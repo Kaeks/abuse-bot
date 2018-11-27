@@ -25,7 +25,7 @@ if (!Storage.hasOwnProperty("debug")) {
 
 fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 
-var amt = Storage.amt; 
+var amt = Storage.amt;
 
 
 bot.on('ready', () => {
@@ -37,9 +37,13 @@ bot.on('message', msg => {
 	if (msg.isMentioned(bot.user)) {
 		msg.channel.send("wassup " + msg.author);
 	}
-	
-	checkMessageForCommand(msg);
-	
+
+	if (checkMessageForCommand(msg)) {
+		setTimeout(function() {
+			msg.delete();
+		}, 3000);
+	}
+
 });
 
 var commands = {
@@ -79,6 +83,7 @@ var commands = {
 	},
 	"sperm": {
 		usage: "<user>",
+		description: "Spam <user>'s DMs.",
 		process: function(bot, msg, suffix) {
 			console.log(msg.mentions);
 			for (let i = 0; i < 5; i++) {
@@ -116,7 +121,7 @@ var commands = {
 					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 				}
 				break;
-				
+
 				case "debug":
 				if (args.length == 1) {
 					msg.channel.send("`debug` is set to `" + Storage.debug + "`.");
@@ -131,44 +136,61 @@ var commands = {
 						Storage.debug = args[1];
 						msg.channel.send("`debug` has been set to `" + args[1] + "`.");
 						fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+					} else {
+						msg.channel.send("Excuse me, what the frick?").then((message => message.delete(5000)));
 					}
 				}
 				break;
 			}
 		}
+	},
+	"embedtest": {
+		process: function(bot, msg, suffix) {
+			let embed = new Discord.RichEmbed()
+				.setTitle("Title")
+				.setAuthor("Author", "https://cdn.discordapp.com/attachments/269556649952280576/516366500576362502/Z.png")
+				.setColor(0x00AE86)
+				.setDescription("Main Text 2048char")
+				.setFooter("Footer 2048char", "https://cdn.discordapp.com/attachments/269556649952280576/516366500576362502/Z.png")
+				.setImage("https://cdn.discordapp.com/attachments/269556649952280576/516366500576362502/Z.png")
+				.setThumbnail("https://cdn.discordapp.com/attachments/269556649952280576/516366500576362502/Z.png")
+				.addField("Field Title 256char", "Field Value 2048char")
+				.addField("Inline Field 256char", "Inline Field Value 2048char", true)
+				.addBlankField(true)
+				.addField("Max of 25 Fields", "hi", true);
+			msg.channel.send({embed});
+		}
 	}
 }
 
-function displayHelp(cmd/*, sub*/) {
-	debugLog("Display help of " + cmd);
-	let info = "";
+function displayHelp(cmd) {
+	let embed = new Discord.RichEmbed()
+		.setTitle("Help for " + Storage.prefix + cmd)
+		.setColor(0x00AE86);
+
 	let usage = commands[cmd].usage;
-	debugLog(usage);
 	let description = commands[cmd].description;
-	debugLog(description);
+	let temp = "";
 	if (usage instanceof Object && description instanceof Object) {
-		debugLog("usage is object of length " + usage.length);
 		for (let i = 0; i < usage.length; i++) {
-			info += "**" + Storage.prefix + cmd + "**";
-			info += " " + usage[i];
-			debugLog("usage[i] = " + usage[i]);
+			temp += "`" + Storage.prefix + cmd + " " + usage[i] + "`";
 			if (description[i]) {
-				info += "\n\t" + description[i];
-				debugLog("description[i] = " + description[i]);
+				temp += "\n-- " + description[i];
 			}
-			info += "\n";
+			temp += "\n";
 		}
 	} else {
-		info += "**" + Storage.prefix + cmd + "**";
+		temp += "`" + Storage.prefix + cmd;
 		if (usage) {
-			info += " " + usage;
+			temp += " " + usage;
 		}
+		temp += "`";
 		if (description) {
-			info += "\n\t" + description;
+			temp += "\n-- " + description;
 		}
 	}
-	debugLog(info);
-	return info;
+	embed = embed.setDescription(temp);
+	return {embed};
 }
 
 function checkMessageForCommand(msg) {
@@ -178,9 +200,9 @@ function checkMessageForCommand(msg) {
 		debugLog("cmdText: " + cmdText);
 		let suffix = msg.content.substring(cmdText.length + Storage.prefix.length + 1);
 		debugLog("suffix: " + suffix);
-		
+
 		let cmd = commands[cmdText];
-		
+
 		if (cmdText == "help") {
 			//command is help
 			if (suffix) {
@@ -190,44 +212,39 @@ function checkMessageForCommand(msg) {
 				let info = displayHelp(helpCmd);
 				msg.channel.send(info);
 			} else {
-				msg.author.send("**Available Commands:**").then(function() {
-					let batch = "";
-					for (let cmd in commands) {
-						var info = "";
-						let usage = commands[cmd].usage;
-						let description = commands[cmd].description;
-						if (usage instanceof Object && description instanceof Object) {
-							for (let i = 0; i < usage.length; i++) {
-								info += "**" + Storage.prefix + cmd + "**";
-								info += " " + usage[i];
-								if (description[i]) {
-									info += "\n\t" + description[i];
-								}
-								info += "\n";
+				let embed = new Discord.RichEmbed()
+					.setTitle("Available Commands")
+					.setColor(0x00AE86);
+
+				for (let cmd in commands) {
+					let usage = commands[cmd].usage;
+					let description = commands[cmd].description;
+					if (usage instanceof Object && description instanceof Object) {
+						let temp = "";
+						for (let i = 0; i < usage.length; i++) {
+							temp += "`" + Storage.prefix + cmd + " " + usage[i] + "`";
+							if (description[i]) {
+								temp += "\n-- " + description[i];
 							}
-						} else {
-							info += "**" + Storage.prefix + cmd + "**";
-							if (usage) {
-								info += " " + usage;
-							}
-							if (description) {
-								info += "\n\t" + description;
-							}
-							info += "\n";
+							temp+= "\n";
 						}
-						
-						let newBatch = batch + "\n" + info;
-						if (newBatch.length > (1024 - 8)) {
-							msg.author.send(batch);
-							batch = info;
-						} else {
-							batch = newBatch;
+						embed = embed.addField(Storage.prefix + cmd, temp);
+					} else {
+						let temp = "`" + Storage.prefix + cmd;
+						if (usage) {
+							console.log("usage yes");
+							temp += " " + usage;
 						}
+						temp += "`";
+						if (description) {
+							console.log("desc yes");
+							temp += "\n-- " + description;
+						}
+						temp+= " \n";
+						embed = embed.addField(Storage.prefix + cmd, temp);
 					}
-					if (batch.length > 0) {
-						msg.author.send(batch);
-					}
-				});
+				}
+				msg.author.send({embed});
 			}
 			return true;
 		} else if (cmd) {
