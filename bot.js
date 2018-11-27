@@ -29,8 +29,9 @@ var amt = Storage.amt;
 
 
 bot.on('ready', () => {
-	console.log("I'm in.");
+	console.log("*hacker voice* I'm in.");
 	console.log(bot.user.username);
+	updatePresence();
 });
 
 bot.on('message', msg => {
@@ -39,9 +40,11 @@ bot.on('message', msg => {
 	}
 
 	if (checkMessageForCommand(msg)) {
-		setTimeout(function() {
-			msg.delete();
-		}, 3000);
+		if (msg.channel.type != "dm" && msg.channel.type != "group") {
+			setTimeout(function() {
+				msg.delete();
+			}, 3000);
+		}
 	}
 
 });
@@ -119,6 +122,7 @@ var commands = {
 					Storage.prefix = newPrefix;
 					msg.channel.send("Bot prefix has been set to `" + newPrefix + "`.");
 					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+					updatePresence();
 				}
 				break;
 
@@ -160,7 +164,34 @@ var commands = {
 				.addField("Max of 25 Fields", "hi", true);
 			msg.channel.send({embed});
 		}
+	},
+	"f": {
+		usage: "",
+		description: "Pay respects.",
+		process: function(bot, msg, suffix) {
+			let embed = new Discord.RichEmbed()
+				.setColor(0x00AE86)
+				.setAuthor(msg.author.username, msg.author.displayAvatarURL)
+				.setImage("https://cdn.discordapp.com/attachments/269556649952280576/517073107891126292/image0.jpg")
+				.setFooter(msg.author.username + " pays his respects.");
+			msg.channel.send({embed});
+		}
 	}
+}
+
+function updatePresence(status, name, type, url) {
+	status = status || "available";
+	name = name || Storage.prefix + "help";
+	type = type || "LISTENING";
+	url = url || "https://www.github.com/Kaeks/abuse-bot";
+	bot.user.setStatus(status);
+	bot.user.setPresence({
+		game: {
+			name: name,
+			type: type,
+			url: url
+		}
+	});
 }
 
 function displayHelp(cmd) {
