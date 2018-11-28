@@ -23,6 +23,19 @@ if (!Storage.hasOwnProperty("debug")) {
 	Storage.debug = true;
 }
 
+if (!Storage.hasOwnProperty("servers")) {
+	Storage.servers = {};
+}
+
+for (let server in Storage.servers) {
+	if (!Storage.servers[server].hasOwnProperty("channels")) {
+		Storage.servers[server].channels = {};
+	}
+	if (!Storage.servers[server].hasOwnProperty("disabledFeatures")) {
+		Storage.servers[server].disabledFeatures = {};
+	}
+}
+
 fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 
 var amt = Storage.amt;
@@ -32,6 +45,19 @@ bot.on('ready', () => {
 	console.log("*hacker voice* I'm in.");
 	console.log(bot.user.username);
 	updatePresence();
+
+	for (let guild of bot.guilds) {
+		let id = guild[1].id;
+		console.log(id);
+		console.log(Storage.servers.hasOwnProperty(id));
+		if (!Storage.servers.hasOwnProperty(id)) {
+			console.log("doing it");
+			Storage["servers"][id] = {};
+		}
+	}
+	console.log(Storage);
+	fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+
 });
 
 bot.on('message', msg => {
