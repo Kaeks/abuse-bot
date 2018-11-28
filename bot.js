@@ -139,8 +139,7 @@ var commands = {
 				msg.channel.send(displayHelp("config"));
 			}
 			let args = suffix.split(" ");
-			switch (args[0]) {
-				case "prefix":
+			if (args[0] == "prefix") {
 				if (args.length == 1) {
 					msg.channel.send("Bot prefix is currently `" + Storage.prefix + "`.");
 				} else {
@@ -150,9 +149,8 @@ var commands = {
 					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 					updatePresence();
 				}
-				break;
 
-				case "debug":
+			} else if (args[0] == "debug") {
 				if (args.length == 1) {
 					msg.channel.send("`debug` is set to `" + Storage.debug + "`.");
 				} else {
@@ -170,7 +168,6 @@ var commands = {
 						msg.channel.send("Excuse me, what the frick?").then((message => message.delete(5000)));
 					}
 				}
-				break;
 			}
 		}
 	},
