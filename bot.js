@@ -153,13 +153,13 @@ var commands = {
 				msg.channel.send({embed});
 				return;
 			}
-			let server = msg.guild.id;
 			if (args[0] == "channel" || args[0] == "test") {
 				if (msg.channel.type == "dm" || msg.channel.type == "group") {
 					msg.channel.send("Cannot be used in (group) DMs.").then((message => message.delete(5000)));
 					return;
 				}
 			}
+			let server = msg.guild.id;
 			if (args[0] == "channel") {
 				if (args[1] == "set") {
 					let channel;
