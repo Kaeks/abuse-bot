@@ -3,6 +3,13 @@ const auth = require('./auth.json');
 const token = auth.token;
 const bot = new Discord.Client();
 const fs = require('fs');
+const CronJob = require('cron').CronJob;
+new CronJob("5 0 0 * * 3", function() {
+	for (let server in Storage.servers) {
+		sendWednesday(server);
+	}
+}, null, true, "Europe/Berlin");
+
 var Storage = {};
 try {
 	Storage = require("./vars.json");
@@ -121,6 +128,73 @@ var commands = {
 			msg.mentions.users.first().send("spermed by " + msg.author);
 		}
 	},
+	"wednesday": {
+		usage: [
+			"",
+			"enable/disable",
+			"channel",
+			"channel set [textChannel]",
+			"test"
+		],
+		description: [
+			"It is wednesday, my dudes.",
+			"Enable/disable wednesday posting.",
+			"View channel for wednesdays.",
+			"Set channel for wednesdays.",
+			"Simulate a wednesday."
+		],
+		process: function(bot, msg, suffix) {
+			let args = suffix.split(" ");
+			if (args[0] == "") {
+				let embed = new Discord.RichEmbed()
+					.setTitle("It is Wednesday, my dudes.")
+					.setColor(0x00AE86)
+					.setImage("https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg");
+				msg.channel.send({embed});
+				return;
+			}
+			let server = msg.guild.id;
+			if (args[0] == "channel" || args[0] == "test") {
+				if (msg.channel.type == "dm" || msg.channel.type == "group") {
+					msg.channel.send("Cannot be used in (group) DMs.").then((message => message.delete(5000)));
+					return;
+				}
+			}
+			if (args[0] == "channel") {
+				if (args[1] == "set") {
+					let channel;
+					if (args[2]) {
+						channel = msg.mentions.channels.first();
+					} else {
+						channel = msg.channel;
+					}
+					if (!Storage["servers"][server].hasOwnProperty("channels")) {
+						Storage["servers"][server]["channels"] = {};
+					}
+					Storage["servers"][server]["channels"]["wednesday"] = channel.id;
+					msg.channel.send("Channel for wednesdays has been set to " + channel);
+					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+				} else {
+					let channelID = Storage["servers"][server]["channels"]["wednesday"];
+					let channel = bot.channels.get(channelID);
+					msg.channel.send("Channel for wednesdays is " + channel);
+				}
+			}
+			if (args[0] == "enable") {
+				Storage.servers[server].disabledFeatures.wednesday = false;
+				msg.channel.send("Wednesdaily frog has been enabled. :frog:");
+				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+			}
+			if (args[0] == "disable") {
+				Storage.servers[server].disabledFeatures.wednesday = true;
+				msg.channel.send("Wednesdaily frog has been disabled. <:tairaOOF:455716045987250186>");
+				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+			}
+			if (args[0] == "test") {
+				sendWednesday(server);
+			}
+		}
+	},
 	"config": {
 		usage: [
 			"prefix",
@@ -199,6 +273,17 @@ var commands = {
 				.setFooter(msg.author.username + " pays his respects.");
 			msg.channel.send({embed});
 		}
+	}
+}
+
+function sendWednesday(serverID) {
+	let embed = new Discord.RichEmbed()
+		.setTitle("It is Wednesday, my dudes.")
+		.setColor(0x00AE86)
+		.setImage("https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg");
+	if (Storage["servers"][serverID]["channels"].hasOwnProperty("wednesday") && (Storage.servers[serverID].disabledFeatures.wednesday == false || Storage.servers[serverID].disabledFeatures.wednesday == undefined)) {
+		let channel = Storage["servers"][serverID]["channels"]["wednesday"];
+	 	bot.channels.get(channel).send({embed});
 	}
 }
 
