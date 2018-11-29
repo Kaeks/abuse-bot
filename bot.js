@@ -54,13 +54,7 @@ bot.on('ready', () => {
 	updatePresence();
 
 	for (let guild of bot.guilds) {
-		let id = guild[1].id;
-		console.log(id);
-		console.log(Storage.servers.hasOwnProperty(id));
-		if (!Storage.servers.hasOwnProperty(id)) {
-			console.log("doing it");
-			Storage["servers"][id] = {};
-		}
+		setUpServer(guild[1]);
 	}
 	console.log(Storage);
 	fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
@@ -80,6 +74,15 @@ bot.on('message', msg => {
 		}
 	}
 
+});
+
+bot.on('guildCreate', guild => {
+	console.log("Joined server '" + guild.name + "'.");
+	setUpServer(guild);
+});
+
+bot.on('guildDelete', guild => {
+	console.log("Whoa whoa whoa I just got kicked from " + guild.name);
 });
 
 var commands = {
@@ -273,6 +276,21 @@ var commands = {
 				.setFooter(msg.author.username + " pays his respects.");
 			msg.channel.send({embed});
 		}
+	}
+}
+
+function setUpServer(server) {
+	if (!Storage.servers.hasOwnProperty(server.id)) {
+		console.log("Added '" + server.name + "' to server list.");
+		Storage.servers[server.id] = {};
+	}
+	if (!Storage.servers[server.id].hasOwnProperty("channels")) {
+		console.log("Added channels property.");
+		Storage.servers[server.id].channels = {};
+	}
+	if (!Storage.servers[server.id].hasOwnProperty("disabledFeatures")) {
+		console.log("Added disabledFeatures property.");
+		Storage.servers[server.id].disabledFeatures = {};
 	}
 }
 
