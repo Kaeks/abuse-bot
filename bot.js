@@ -4,9 +4,22 @@ const token = auth.token;
 const bot = new Discord.Client();
 const fs = require('fs');
 const CronJob = require('cron').CronJob;
+
 new CronJob("5 0 0 * * 3", function() {
 	for (let server in Storage.servers) {
-		sendWednesday(server);
+		if (Storage.servers[server].channels.hasOwnProperty("wednesday")) {
+			if (Storage.servers[server].disabledFeatures.wednesday == false || Storage.servers[server].disabledFeatures.wednesday == undefined) {
+				let channel = Storage.servers[server].channels.wednesday;
+				sendWednesday(channel);
+			}
+		}
+	}
+	for (let user in Storage.users) {
+		if (Storage.users[user].hasOwnProperty("wednesday")) {
+			if (Storage.users[user].wednesday == true) {
+				sendWednesday(bot.users.get(user).dmChannel.id);
+			}
+		}
 	}
 }, null, true, "Europe/Berlin");
 
@@ -141,14 +154,16 @@ var commands = {
 			"enable/disable",
 			"channel",
 			"channel set [textChannel]",
+			"subscribe/unsubscribe",
 			"test"
 		],
 		description: [
-			"It is wednesday, my dudes.",
-			"Enable/disable wednesday posting.",
-			"View channel for wednesdays.",
-			"Set channel for wednesdays.",
-			"Simulate a wednesday."
+			"It is Wednesday, my dudes.",
+			"Enable/disable Wednesday posting.",
+			"View channel for Wednesdays.",
+			"Set channel for Wednesdays.",
+			"Subscribe/unsubscribe from the private Wednesday service.",
+			"Simulate a Wednesday."
 		],
 		process: function(bot, msg, suffix) {
 			let args = suffix.split(" ");
@@ -160,14 +175,16 @@ var commands = {
 				msg.channel.send({embed});
 				return;
 			}
-			if (args[0] == "channel" || args[0] == "test") {
+			let server;
+			if (args[0] == "enable" || args[0] == "disable" || args[0] == "channel") {
 				if (msg.channel.type == "dm" || msg.channel.type == "group") {
 					msg.channel.send("Cannot be used in (group) DMs.").then((message => message.delete(5000)));
 					return;
 				}
 			}
-			let server = msg.guild.id;
+			let author = msg.author.id;
 			if (args[0] == "channel") {
+				server = msg.guild.id;
 				if (args[1] == "set") {
 					let channel;
 					if (args[2]) {
@@ -179,26 +196,71 @@ var commands = {
 						Storage["servers"][server]["channels"] = {};
 					}
 					Storage["servers"][server]["channels"]["wednesday"] = channel.id;
-					msg.channel.send("Channel for wednesdays has been set to " + channel);
+					msg.channel.send("Channel for Wednesdays has been set to " + channel);
 					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 				} else {
 					let channelID = Storage["servers"][server]["channels"]["wednesday"];
 					let channel = bot.channels.get(channelID);
-					msg.channel.send("Channel for wednesdays is " + channel);
+					msg.channel.send("Channel for Wednesdays is " + channel);
 				}
 			}
 			if (args[0] == "enable") {
+				server = msg.guild.id;
 				Storage.servers[server].disabledFeatures.wednesday = false;
 				msg.channel.send("Wednesdaily frog has been enabled. :frog:");
 				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 			}
 			if (args[0] == "disable") {
+				server = msg.guild.id;
 				Storage.servers[server].disabledFeatures.wednesday = true;
 				msg.channel.send("Wednesdaily frog has been disabled. <:tairaOOF:455716045987250186>");
 				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 			}
+			if (args[0] == "subscribe" || args[0] == "unsubscribe") {
+				if (!Storage.users.hasOwnProperty(author)) {
+					Storage.users[author] = {};
+					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+				}
+			}
+			if (args[0] == "subscribe") {
+				if (Storage.users[author].wednesday == true) {
+					msg.channel.send("You are already subscribed to the private Wednesday service.");
+				} else {
+					Storage.users[author].wednesday = true;
+					msg.channel.send("You are now subscribed to the private Wednesday service.");
+					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+				}
+			}
+			if (args[0] == "unsubscribe") {
+				if (Storage.users[author].wednesday == true) {
+					Storage.users[author].wednesday = false;
+					msg.channel.send("You are no longer subscribed to the private Wednesday service.");
+					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+				} else {
+					msg.channel.send("You are not subscribed to the private Wednesday service.");
+				}
+			}
 			if (args[0] == "test") {
-				sendWednesday(server);
+				if (msg.channel.type == "dm" || msg.channel.type == "group") {
+					if (Storage.users[author].wednesday == true) {
+						sendWednesday(bot.users.get(author).dmChannel.id);
+					} else {
+						msg.channel.send("You need to subscribe to the Wednesday frog service first.");
+					}
+				}
+				if (msg.channel.type == "text") {
+					server = msg.guild.id;
+					if (Storage.servers[server].channels.hasOwnProperty("wednesday")) {
+						if (Storage.servers[server].disabledFeatures.wednesday == false || Storage.servers[server].disabledFeatures.wednesday == undefined) {
+							let channelID = Storage.servers[server].channels.wednesday;
+							sendWednesday(channelID);
+						} else {
+							msg.channel.send("This server has disabled the Wednesday frog service.");
+						}
+					} else {
+						msg.channel.send("This server doesn't have a channel for the Wednesday frog to be sent to.");
+					}
+				}
 			}
 		}
 	},
@@ -298,15 +360,12 @@ function setUpServer(server) {
 	}
 }
 
-function sendWednesday(serverID) {
+function sendWednesday(channelID) {
 	let embed = new Discord.RichEmbed()
 		.setTitle("It is Wednesday, my dudes.")
 		.setColor(0x00AE86)
 		.setImage("https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg");
-	if (Storage["servers"][serverID]["channels"].hasOwnProperty("wednesday") && (Storage.servers[serverID].disabledFeatures.wednesday == false || Storage.servers[serverID].disabledFeatures.wednesday == undefined)) {
-		let channel = Storage["servers"][serverID]["channels"]["wednesday"];
-	 	bot.channels.get(channel).send({embed});
-	}
+	bot.channels.get(channelID).send({embed});
 }
 
 function updatePresence(status, name, type, url) {
