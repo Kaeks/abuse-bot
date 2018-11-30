@@ -34,6 +34,10 @@ if (!Storage.hasOwnProperty("servers")) {
 	Storage.servers = {};
 }
 
+if (!Storage.hasOwnProperty("users")) {
+	Storage.users = {};
+}
+
 for (let server in Storage.servers) {
 	if (!Storage.servers[server].hasOwnProperty("channels")) {
 		Storage.servers[server].channels = {};
