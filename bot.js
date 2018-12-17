@@ -31,6 +31,18 @@ try {
 	fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 }
 
+var Blocked = {};
+try {
+	Blocked = require("./blocked_users.json");
+	debugLog("Read blocked_users.json");
+} catch (e) {
+	fs.writeFileSync("./blocked_users.json", JSON.stringify(Blocked, null, 2));
+}
+
+if (!Blocked.hasOwnProperty("users")) {
+	Blocked.users = [];
+}
+
 if (!Storage.hasOwnProperty("prefix")) {
 	Storage.prefix = "!";
 }
@@ -61,6 +73,7 @@ for (let server in Storage.servers) {
 }
 
 fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+fs.writeFileSync("./blocked_users.json", JSON.stringify(Blocked, null, 2));
 
 var amt = Storage.amt;
 
@@ -414,6 +427,12 @@ function displayHelp(cmd) {
 }
 
 function checkMessageForCommand(msg) {
+	for (let i = 0; i < Blocked.users.length; i++) {
+		if (msg.author.id == Blocked.users[i]) {
+			msg.channel.send("Oof, you've been blocked from using me.");
+			return false;
+		}
+	}
 	if (msg.author.id != bot.user.id && msg.content.startsWith(Storage.prefix)) {
 		console.log("'" + msg.content + "' by " + msg.author + " is command");
 		let cmdText = msg.content.split(" ")[0].substring(Storage.prefix.length);
