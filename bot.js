@@ -427,14 +427,15 @@ function displayHelp(cmd) {
 }
 
 function checkMessageForCommand(msg) {
-	for (let i = 0; i < Blocked.users.length; i++) {
-		if (msg.author.id == Blocked.users[i]) {
-			msg.channel.send("Oof, you've been blocked from using me.");
-			return false;
-		}
-	}
 	if (msg.author.id != bot.user.id && msg.content.startsWith(Storage.prefix)) {
 		console.log("'" + msg.content + "' by " + msg.author + " is command");
+		for (let i = 0; i < Blocked.users.length; i++) {
+			if (msg.author.id == Blocked.users[i]) {
+				console.log("User is on blocked user list");
+				msg.channel.send("Oof, you've been blocked from using me.");
+				return false;
+			}
+		}
 		let cmdText = msg.content.split(" ")[0].substring(Storage.prefix.length);
 		debugLog("cmdText: " + cmdText);
 		let suffix = msg.content.substring(cmdText.length + Storage.prefix.length + 1);
