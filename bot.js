@@ -47,10 +47,6 @@ if (!Storage.hasOwnProperty("prefix")) {
 	Storage.prefix = "!";
 }
 
-if (!Storage.hasOwnProperty("amt")) {
-	Storage.amt = 0;
-}
-
 if (!Storage.hasOwnProperty("debug")) {
 	Storage.debug = true;
 }
@@ -74,8 +70,6 @@ for (let server in Storage.servers) {
 
 fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 fs.writeFileSync("./blocked_users.json", JSON.stringify(Blocked, null, 2));
-
-var amt = Storage.amt;
 
 
 bot.on('ready', () => {
@@ -121,33 +115,6 @@ bot.on('guildDelete', guild => {
 });
 
 var commands = {
-	"abuse": {
-		usage: [
-			"",
-			"check"
-		],
-		description: [
-			"Add to the abuse counter.",
-			"Display amount of abuses."
-		],
-		process: function(bot, msg, suffix) {
-			if (suffix != "check") {
-				amt++;
-				Storage.amt = amt;
-				fs.writeFile("./vars.json", JSON.stringify(Storage, null, 2), function (err) {
-					if (err) {
-						return console.log(err);
-					}
-				});
-			}
-			let string = "Spark people have abused each other " + amt + " time";
-			if (amt == 0 || amt > 1) {
-				string += "s";
-			}
-			string += ".";
-			msg.channel.send(string);
-		}
-	},
 	"wiktor": {
 		usage: "",
 		description: "Brings Wiktor back.",
