@@ -4,6 +4,7 @@ const token = auth.token;
 const bot = new Discord.Client();
 const fs = require('fs');
 const CronJob = require('cron').CronJob;
+require('datejs');
 
 new CronJob("5 0 0 * * 3", function() {
 	for (let server in Storage.servers) {
@@ -59,6 +60,10 @@ if (!Storage.hasOwnProperty("users")) {
 	Storage.users = {};
 }
 
+if (!Storage.hasOwnProperty("reminders")) {
+	Storage.reminders = [];
+}
+
 for (let server in Storage.servers) {
 	if (!Storage.servers[server].hasOwnProperty("channels")) {
 		Storage.servers[server].channels = {};
@@ -76,6 +81,8 @@ bot.on('ready', () => {
 	console.log("*hacker voice* I'm in.");
 	console.log(bot.user.username);
 	updatePresence();
+
+	console.log(Date.now());
 
 	for (let guild of bot.guilds) {
 		setUpServer(guild[1]);
@@ -95,11 +102,11 @@ bot.on('message', msg => {
 		return;
 	}
 	if (checkMessageForCommand(msg)) {
-		if (msg.channel.type != "dm" && msg.channel.type != "group") {
+		/*if (msg.channel.type != "dm" && msg.channel.type != "group") {
 			setTimeout(function() {
 				msg.delete();
 			}, 3000);
-		}
+		}*/
 		return;
 	}
 
@@ -131,6 +138,43 @@ var commands = {
 				msg.mentions.users.first().send("sperm");
 			}
 			msg.mentions.users.first().send("spermed by " + msg.author);
+		}
+	},
+	"reminder": {
+		usage: [
+			"add <time/date>",
+			"remove <#/all>",
+			"list"
+		],
+		description: [
+			"Add a reminder that will remind you until either <time> has passed or remind you on <date>.",
+			"Remove the reminder with list #<#> or remove <all> reminders.",
+			"List all reminders"
+		],
+		process: function(bot, msg, suffix) {
+			if (suffix == "") {
+				msg.channel.send(displayHelp("reminder"));
+			}
+			var dateString = msg.content.match(/(?:reminder add) (.*)/i)[1];
+			console.log(dateString);
+			var date = Date.parse(dateString);
+			if (date != null) {
+				var msgLink = "http://discordapp.com/channels/" + ((msg.channel.type === "text") ? msg.guild.id : "@me") + "/" + msg.channel.id + "/" + msg.id;
+				Storage.reminders.push({
+					"user" : msg.author.id,
+					"date" : date,
+					"msgLink" : msgLink
+				});
+				console.log(Storage.reminders);
+				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+				var embed = new Discord.RichEmbed()
+					.setTitle("Reminder set!")
+					.setDescription("I will remind you about [this message](<" + msgLink + ">) on " + date + ".")
+					.setFooter("I actually won't because my owner is too lazy to implement that right now.");
+				msg.channel.send({embed});
+			} else {
+				console.log("Date parser failed!");
+			}
 		}
 	},
 	"wednesday": {
@@ -324,7 +368,7 @@ var commands = {
 				.setColor(0x00AE86)
 				.setAuthor(msg.author.username, msg.author.displayAvatarURL)
 				.setImage("https://cdn.discordapp.com/attachments/269556649952280576/517073107891126292/image0.jpg")
-				.setFooter(msg.author.username + " pays his respects.");
+				.setFooter(msg.author.username + " pays their respects.");
 			msg.channel.send({embed});
 		}
 	}
