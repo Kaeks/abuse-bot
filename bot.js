@@ -427,84 +427,90 @@ function displayHelp(cmd) {
 }
 
 function checkMessageForCommand(msg) {
-	if (msg.author.id != bot.user.id && msg.content.startsWith(Storage.prefix)) {
-		console.log("'" + msg.content + "' by " + msg.author + " is command");
-		for (let i = 0; i < Blocked.users.length; i++) {
-			if (msg.author.id == Blocked.users[i]) {
-				console.log("User is on blocked user list");
-				msg.channel.send("Oof, you've been blocked from using me.");
-				return false;
-			}
-		}
-		let cmdText = msg.content.split(" ")[0].substring(Storage.prefix.length);
-		debugLog("cmdText: " + cmdText);
-		let suffix = msg.content.substring(cmdText.length + Storage.prefix.length + 1);
-		debugLog("suffix: " + suffix);
-
-		let cmd = commands[cmdText];
-
-		if (cmdText == "help") {
-			//command is help
-			if (suffix) {
-				let helpCmd = suffix.split(" ").filter(function(thing) {
-					return commands[thing];
-				});
-				let info = displayHelp(helpCmd);
-				msg.channel.send(info);
-			} else {
-				let embed = new Discord.RichEmbed()
-					.setTitle("Available Commands")
-					.setColor(0x00AE86);
-
-				for (let cmd in commands) {
-					let usage = commands[cmd].usage;
-					let description = commands[cmd].description;
-					if (usage instanceof Object && description instanceof Object) {
-						let temp = "";
-						for (let i = 0; i < usage.length; i++) {
-							temp += "`" + Storage.prefix + cmd + " " + usage[i] + "`";
-							if (description[i]) {
-								temp += "\n-- " + description[i];
-							}
-							temp+= "\n";
-						}
-						embed = embed.addField(Storage.prefix + cmd, temp);
-					} else {
-						let temp = "`" + Storage.prefix + cmd;
-						if (usage) {
-							console.log("usage yes");
-							temp += " " + usage;
-						}
-						temp += "`";
-						if (description) {
-							console.log("desc yes");
-							temp += "\n-- " + description;
-						}
-						temp+= " \n";
-						embed = embed.addField(Storage.prefix + cmd, temp);
-					}
+	if (msg.author.id != bot.user.id) {
+		if (msg.content.startsWith(Storage.prefix)) {
+			console.log("'" + msg.content + "' by " + msg.author + " is command");
+			for (let i = 0; i < Blocked.users.length; i++) {
+				if (msg.author.id == Blocked.users[i]) {
+					console.log("User is on blocked user list");
+					msg.channel.send("Oof, you've been blocked from using me.");
+					return false;
 				}
-				msg.author.send({embed});
 			}
-			return true;
-		} else if (cmd) {
-			try {
-				cmd.process(bot, msg, suffix);
-			} catch (e) {
-				console.log(e.stack);
-				let msgText = "command " + cmdText + " failed. yikes.";
-				msg.channel.send(msgText);
+			let cmdText = msg.content.split(" ")[0].substring(Storage.prefix.length);
+			debugLog("cmdText: " + cmdText);
+			let suffix = msg.content.substring(cmdText.length + Storage.prefix.length + 1);
+			debugLog("suffix: " + suffix);
+
+			let cmd = commands[cmdText];
+
+			if (cmdText == "help") {
+				//command is help
+				if (suffix) {
+					let helpCmd = suffix.split(" ").filter(function(thing) {
+						return commands[thing];
+					});
+					let info = displayHelp(helpCmd);
+					msg.channel.send(info);
+				} else {
+					let embed = new Discord.RichEmbed()
+						.setTitle("Available Commands")
+						.setColor(0x00AE86);
+
+					for (let cmd in commands) {
+						let usage = commands[cmd].usage;
+						let description = commands[cmd].description;
+						if (usage instanceof Object && description instanceof Object) {
+							let temp = "";
+							for (let i = 0; i < usage.length; i++) {
+								temp += "`" + Storage.prefix + cmd + " " + usage[i] + "`";
+								if (description[i]) {
+									temp += "\n-- " + description[i];
+								}
+								temp+= "\n";
+							}
+							embed = embed.addField(Storage.prefix + cmd, temp);
+						} else {
+							let temp = "`" + Storage.prefix + cmd;
+							if (usage) {
+								console.log("usage yes");
+								temp += " " + usage;
+							}
+							temp += "`";
+							if (description) {
+								console.log("desc yes");
+								temp += "\n-- " + description;
+							}
+							temp+= " \n";
+							embed = embed.addField(Storage.prefix + cmd, temp);
+						}
+					}
+					msg.author.send({embed});
+				}
+				return true;
+			} else if (cmd) {
+				try {
+					cmd.process(bot, msg, suffix);
+				} catch (e) {
+					console.log(e.stack);
+					let msgText = "command " + cmdText + " failed. yikes.";
+					msg.channel.send(msgText);
+				}
+				return true;
+			} else {
+				console.log(cmdText + " not recognized as a command!");
+				//msg.channel.send(cmdText + " not recognized as a command!").then((message => message.delete(5000)));
+				return true;
 			}
-			return true;
 		} else {
-			console.log(cmdText + " not recognized as a command!");
-			//msg.channel.send(cmdText + " not recognized as a command!").then((message => message.delete(5000)));
-			return true;
+			//message is not a command
+			return false;
 		}
-	} else {
-		//message is not a command or from the bot itself
-		return false;
+		if (msg.content.match(/(eat.*ass)/i)) {
+			msg.channel.send("Hey, " + msg.author + " that's not very nice of you!");
+		}
 	}
+	return false;
 }
 
 function debugLog(msg) {
