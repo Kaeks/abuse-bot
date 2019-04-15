@@ -92,16 +92,21 @@ bot.on('ready', () => {
 });
 
 bot.on('message', msg => {
+	if (msg.content.match(/(eat.*ass)/i)) {
+		msg.channel.send("Hey, " + msg.author + " that's not very nice of you!");
+		return;
+	}
 	if (msg.isMentioned(bot.user)) {
 		msg.channel.send("wassup " + msg.author);
+		return;
 	}
-
 	if (checkMessageForCommand(msg)) {
 		if (msg.channel.type != "dm" && msg.channel.type != "group") {
 			setTimeout(function() {
 				msg.delete();
 			}, 3000);
 		}
+		return;
 	}
 
 });
@@ -505,9 +510,6 @@ function checkMessageForCommand(msg) {
 		} else {
 			//message is not a command
 			return false;
-		}
-		if (msg.content.match(/(eat.*ass)/i)) {
-			msg.channel.send("Hey, " + msg.author + " that's not very nice of you!");
 		}
 	}
 	return false;
