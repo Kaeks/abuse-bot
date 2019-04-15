@@ -93,7 +93,7 @@ bot.on('ready', () => {
 
 bot.on('message', msg => {
 	if (msg.content.match(/(eat.*ass)/i)) {
-		msg.channel.send("Hey, " + msg.author + " that's not very nice of you!");
+		msg.channel.send("Hey " + msg.author + ", that's not very nice of you!");
 		return;
 	}
 	if (msg.isMentioned(bot.user)) {
