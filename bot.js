@@ -369,7 +369,13 @@ var commands = {
 			let user = msg.author;
 			switch(args[0]) {
 				case "status":
-				let seconds = Math.floor(getWaterTimerStatus() / 1000);
+				//Catch users not in the water club
+				if (typeof Storage.users[user.id] == "undefined" || typeof Storage.users[user.id].water == "undefined" || typeof Storage.users[user.id].water.enabled == "undefined" || Storage.users[user.id].water.enabled != true) {
+					msg.channel.send("Wait, that's illegal. You are not a member of the water club.");
+					break;
+				}
+				//Alright, they're out!
+				let seconds = Math.floor(getWaterTimerStatus(user.id) / 1000);
 				let minutes = Math.floor(seconds / 60);
 				let newSeconds = seconds - minutes * 60;
 				let string = minutes + " minutes, " + newSeconds + " seconds";
@@ -399,7 +405,7 @@ var commands = {
 				break;
 
 				case "leave":
-				if (typeof Storage.users[user.id].water == "undefined" || typeof Storage.users[user.id].water.enabled == "undefined" || Storage.users[user.id].water.enabled != true) {
+				if (typeof Storage.users[user.id] == "undefined" || typeof Storage.users[user.id].water == "undefined" || typeof Storage.users[user.id].water.enabled == "undefined" || Storage.users[user.id].water.enabled != true) {
 					msg.channel.send("Can't leave a club you are not a member of :^)");
 					break;
 				}
@@ -410,7 +416,7 @@ var commands = {
 
 				case "interval":
 				//Catch users not in the water club
-				if (typeof Storage.users[user.id].water == "undefined" || typeof Storage.users[user.id].water.enabled == "undefined" || Storage.users[user.id].water.enabled != true) {
+				if (typeof Storage.users[user.id] == "undefined" || typeof Storage.users[user.id].water == "undefined" || typeof Storage.users[user.id].water.enabled == "undefined" || Storage.users[user.id].water.enabled != true) {
 					msg.channel.send("Wait, that's illegal. You are not a member of the water club.");
 					break;
 				}
@@ -573,7 +579,7 @@ function updateWaterTimer(user) {
 
 function getWaterTimerStatus(user) {
 	let now = (new Date()).getTime();
-	let diff = now - runningTimers[user].started;
+	let diff = (runningTimers[user].started + waterTimers[user] * 1000) - now;
 	return diff;
 }
 
@@ -584,6 +590,10 @@ async function sendDM(user, message) {
 }
 
 function sendWater(user) {
+	let actualUser = bot.users.get(user);
+	if (actualUser.presence.status == "offline" || actualUser.presence.status == "dnd") {
+		return;
+	}
 	let embed = new Discord.RichEmbed()
 		.setTitle("Stay hydrated!")
 		.setDescription("Drink some water **now**.")
