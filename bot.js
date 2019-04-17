@@ -4,6 +4,8 @@ const token = auth.token;
 const bot = new Discord.Client();
 const fs = require('fs');
 const CronJob = require('cron').CronJob;
+var waterTimers = {};
+var runningTimers = {};
 require('datejs');
 
 var Storage = {};
@@ -91,6 +93,13 @@ bot.on('ready', () => {
 	for (let guild of bot.guilds) {
 		setUpServer(guild[1]);
 	}
+
+	loadWaterTimers();
+	console.log(waterTimers);
+	console.log(runningTimers);
+	startAllWaterTimers();
+	console.log(runningTimers);
+
 	console.log(Storage);
 	saveVars();
 
@@ -339,6 +348,106 @@ var commands = {
 			}
 		}
 	},
+	"water": {
+		usage: [
+			"status",
+			"join",
+			"leave",
+			"interval [set <minutes>]"
+		],
+		description: [
+			"Display your current water status.",
+			"Join the water club.",
+			"Leave the water club.",
+			"Display your current interval or set a new interval."
+		],
+		process: function(bot, msg, suffix) {
+			if (suffix == "") {
+				msg.channel.send(displayHelp("water"));
+			}
+			let args = suffix.split(" ");
+			let user = msg.author;
+			switch(args[0]) {
+				case "status":
+				let seconds = Math.floor(getWaterTimerStatus() / 1000);
+				let minutes = Math.floor(seconds / 60);
+				let newSeconds = seconds - minutes * 60;
+				let string = minutes + " minutes, " + newSeconds + " seconds";
+				msg.channel.send("Your next reminder will be issued in " + string + ".");
+				break;
+
+				case "join":
+				const WATER_INTERVAL = 60;
+				if (typeof Storage.users[user.id] == "undefined") {
+					Storage.users[user.id] = {};
+				}
+				if (typeof Storage.users[user.id].water == "undefined") {
+					Storage.users[user.id].water = {};
+				}
+				console.log(Storage.users);
+				if (Storage.users[user.id].water.enabled == true) {
+					msg.channel.send("You are already a member of the water club!");
+					break;
+				}
+				console.log(Storage.users);
+				Storage.users[user.id].water.enabled = true;
+				Storage.users[user.id].water.interval = WATER_INTERVAL;
+				console.log(Storage.users);
+				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+				console.log(Storage.users);
+				msg.channel.send("Welcome to the water club, " + msg.author + "!\nYou will be notified every " + WATER_INTERVAL + " minutes (default value).");
+				break;
+
+				case "leave":
+				if (typeof Storage.users[user.id].water == "undefined" || typeof Storage.users[user.id].water.enabled == "undefined" || Storage.users[user.id].water.enabled != true) {
+					msg.channel.send("Can't leave a club you are not a member of :^)");
+					break;
+				}
+				Storage.users[user.id].water.enabled = false;
+				saveVars()
+				msg.channel.send("You have left the water club. Sad to see you go! :(");
+				break;
+
+				case "interval":
+				//Catch users not in the water club
+				if (typeof Storage.users[user.id].water == "undefined" || typeof Storage.users[user.id].water.enabled == "undefined" || Storage.users[user.id].water.enabled != true) {
+					msg.channel.send("Wait, that's illegal. You are not a member of the water club.");
+					break;
+				}
+				//Alright, they're out!
+				if (args[1] == null) {
+					let userInterval = Storage.users[user.id].water.interval;
+					msg.channel.send("Your interval is set to " + userInterval + " minutes.");
+					break;
+				}
+				if (args[1] == "set") {
+					if (args[2] != null) {
+						let newIntervalString = args[2];
+						if (!isNaN(newIntervalString)) {
+							if (parseInt(newIntervalString, 10) > 0 ) {
+								let newInterval = parseInt(newIntervalString, 10);
+								Storage.users[user.id].water.interval = newInterval;
+								saveVars();
+								msg.channel.send("Water interval has been set to " + newInterval + " minutes.");
+								console.log(waterTimers);
+								console.log(runningTimers);
+								updateWaterTimer(user.id);
+								console.log(waterTimers);
+								console.log(runningTimers);
+							} else {
+								msg.channel.send("<interval> must be above 0.");
+							}
+						} else {
+							msg.channel.send("<interval> must be an integer.");
+						}
+					} else {
+						msg.channel.send("Usage: `" + Storage.prefix + "water set <interval in minutes>`");
+					}
+				}
+				break;
+			}
+		}
+	},
 	"config": {
 		usage: [
 			"prefix",
@@ -418,6 +527,81 @@ var commands = {
 			msg.channel.send({embed});
 		}
 	}
+}
+
+function loadWaterTimers() {
+	for (let user in Storage.users) {
+		if (Storage.users[user].hasOwnProperty("water")) {
+			if (Storage.users[user].water.enabled == true) {
+				addWaterTimer(user, Storage.users[user].water.interval);
+			}
+		}
+	}
+}
+
+function addWaterTimer(user, interval) {
+	waterTimers[user] = interval;
+}
+
+function startAllWaterTimers() {
+	for (let user in waterTimers) {
+		startWaterTimer(user);
+	}
+}
+
+function startWaterTimer(user) {
+	let now = (new Date()).getTime();
+	let curTimer = setInterval(function() {
+		sendWater(user);
+	}, waterTimers[user] * 60000);
+	if (runningTimers[user] == null) {
+		runningTimers[user] = {};
+	}
+	runningTimers[user].timer = curTimer;
+	runningTimers[user].started = now;
+}
+
+function stopWaterTimer(user) {
+	clearInterval(runningTimers[user].timer);
+}
+
+function updateWaterTimer(user) {
+	stopWaterTimer(user);
+	waterTimers[user] = Storage.users[user].water.interval;
+	startWaterTimer(user);
+}
+
+function getWaterTimerStatus(user) {
+	let now = (new Date()).getTime();
+	let diff = now - runningTimers[user].started;
+	return diff;
+}
+
+async function sendDM(user, message) {
+	let cur = bot.users.get(user);
+	let channel = await cur.createDM();
+	channel.send(message);
+}
+
+function sendWater(user) {
+	let embed = new Discord.RichEmbed()
+		.setTitle("Stay hydrated!")
+		.setDescription("Drink some water **now**.")
+		.setThumbnail("https://media.istockphoto.com/photos/splash-fresh-drop-in-water-close-up-picture-id801948192");
+	sendDM(user, {embed});
+}
+
+function unparseDate(date) {
+	if (Date.compare(Date.parse(date), (1).day().fromNow()) == 1) {
+		if (Date.compare(Date.parse(date), (1).year().fromNow()) == 1) {
+			dateString = Date.parse(date).toString("MMM dS, yyyy HH:mm");
+		} else {
+			dateString = Date.parse(date).toString("MMM dS HH:mm");
+		}
+	} else {
+		dateString = Date.parse(date).toString("HH:mm");
+	}
+	return dateString;
 }
 
 function setUpServer(server) {
