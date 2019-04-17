@@ -164,25 +164,62 @@ var commands = {
 			if (suffix == "") {
 				msg.channel.send(displayHelp("reminder"));
 			}
-			var dateString = msg.content.match(/(?:reminder add) (.*)/i)[1];
-			console.log(dateString);
-			var date = Date.parse(dateString);
-			if (date != null) {
-				var msgLink = "http://discordapp.com/channels/" + ((msg.channel.type === "text") ? msg.guild.id : "@me") + "/" + msg.channel.id + "/" + msg.id;
-				Storage.reminders.push({
-					"user" : msg.author.id,
-					"date" : date,
-					"msgLink" : msgLink
-				});
-				console.log(Storage.reminders);
-				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
-				var embed = new Discord.RichEmbed()
-					.setTitle("Reminder set!")
-					.setDescription("I will remind you about [this message](<" + msgLink + ">) on " + date + ".")
-					.setFooter("I actually won't because my owner is too lazy to implement that right now.");
+			if (suffix.split(" ")[0] == "add") {
+				let regexString = suffix.match(/(?:add) (.*)(?:-m (.*))/i);
+				console.log(regexString);
+				let date = Date.parse(regexString[1]);
+				let task = regexString[2];
+				if (date != null) {
+					let msgLink = "http://discordapp.com/channels/" + ((msg.channel.type === "text") ? msg.guild.id : "@me") + "/" + msg.channel.id + "/" + msg.id;
+					Storage.reminders.push({
+						"user" : msg.author.id,
+						"date" : date,
+						"msgLink" : msgLink,
+						"task" : task
+					});
+					console.log(Storage.reminders);
+					saveVars();
+					let embed = new Discord.RichEmbed()
+						.setTitle("Reminder set!")
+						.setDescription("I will remind you about [this message](<" + msgLink + ">) on " + date + ".")
+						.setFooter("I actually won't because my owner is too lazy to implement that right now.");
+					msg.channel.send({embed});
+				} else {
+					console.log("Date parser failed!");
+				}
+			}
+			if (suffix.split(" ")[0] == "remove") {
+				let toRemove = suffix.split(" ")[1];
+				if (toRemove == "all") {
+					for (let i = 0; i < Storage.reminders.length; i++) {
+						if (Storage.reminders[i].user == msg.author.id) {
+							Storage.reminders[i] = null;
+						}
+					}
+					saveVars();
+				}
+			}
+			if (suffix.split(" ")[0] == "list") {
+				let tempReminders = [];
+				for (let i = 0; i < Storage.reminders.length; i++) {
+					if (Storage.reminders[i].user == msg.author.id) {
+						tempReminders.push(Storage.reminders[i]);
+					}
+				}
+				let tempText = "";
+				for (let i = 0; i < tempReminders.length; i++) {
+					let cur = tempReminders[i];
+					tempText += "**#" + (i+1) + "** " + unparseDate(cur.date);
+					if (cur.task != null) {
+						tempText += " - " + cur.task;
+					}
+					if (i < tempReminders.length) {
+						tempText += "\n";
+					}
+				}
+				let embed = new Discord.RichEmbed()
+					.setDescription("Here are your reminders, " + msg.author + "!\n" + tempText)
 				msg.channel.send({embed});
-			} else {
-				console.log("Date parser failed!");
 			}
 		}
 	},
