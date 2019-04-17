@@ -6,30 +6,12 @@ const fs = require('fs');
 const CronJob = require('cron').CronJob;
 require('datejs');
 
-new CronJob("5 0 0 * * 3", function() {
-	for (let server in Storage.servers) {
-		if (Storage.servers[server].channels.hasOwnProperty("wednesday")) {
-			if (Storage.servers[server].disabledFeatures.wednesday == false || Storage.servers[server].disabledFeatures.wednesday == undefined) {
-				let channel = Storage.servers[server].channels.wednesday;
-				sendWednesday(channel);
-			}
-		}
-	}
-	for (let user in Storage.users) {
-		if (Storage.users[user].hasOwnProperty("wednesday")) {
-			if (Storage.users[user].wednesday == true) {
-				sendWednesday(bot.users.get(user).dmChannel.id);
-			}
-		}
-	}
-}, null, true, "Europe/Berlin");
-
 var Storage = {};
 try {
 	Storage = require("./vars.json");
 	debugLog("Read vars.json");
 } catch (e) {
-	fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+	saveVars();
 }
 
 var Blocked = {};
@@ -73,34 +55,49 @@ for (let server in Storage.servers) {
 	}
 }
 
-fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+saveVars();
 fs.writeFileSync("./blocked_users.json", JSON.stringify(Blocked, null, 2));
 
+new CronJob("0 0 * * 3", async function() {
+	for (let server in Storage.servers) {
+		if (Storage.servers[server].channels.hasOwnProperty("wednesday")) {
+			if (Storage.servers[server].disabledFeatures.wednesday == false || Storage.servers[server].disabledFeatures.wednesday == undefined) {
+				let channel = Storage.servers[server].channels.wednesday;
+				sendWednesday(channel);
+			}
+		}
+	}
+	for (let user in Storage.users) {
+		if (Storage.users[user].hasOwnProperty("wednesday")) {
+			if (Storage.users[user].wednesday == true) {
+				let cur = bot.users.get(user);
+				let channel = await cur.createDM();
+				sendWednesday(channel.id);
+			}
+		}
+	}
+}, null, true, "Europe/Berlin");
 
+/* Events */
+
+//Start
 bot.on('ready', () => {
 	console.log("*hacker voice* I'm in.");
 	console.log(bot.user.username);
 	updatePresence();
 
-	console.log(Date.now());
+	console.log(Date.now().toString());
 
 	for (let guild of bot.guilds) {
 		setUpServer(guild[1]);
 	}
 	console.log(Storage);
-	fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+	saveVars();
 
 });
 
+//Message
 bot.on('message', msg => {
-	if (msg.content.match(/(eat.*ass)/i)) {
-		msg.channel.send("Hey " + msg.author + ", that's not very nice of you!");
-		return;
-	}
-	if (msg.isMentioned(bot.user)) {
-		msg.channel.send("wassup " + msg.author);
-		return;
-	}
 	if (checkMessageForCommand(msg)) {
 		/*if (msg.channel.type != "dm" && msg.channel.type != "group") {
 			setTimeout(function() {
@@ -109,17 +106,29 @@ bot.on('message', msg => {
 		}*/
 		return;
 	}
+	if (msg.content.match(/(eat.*ass)/i)) {
+		msg.channel.send("Hey " + msg.author + ", that's not very nice of you!");
+		return;
+	}
+	if (msg.isMentioned(bot.user)) {
+		msg.channel.send("wassup " + msg.author);
+		return;
+	}
 
 });
 
+//Join Server
 bot.on('guildCreate', guild => {
 	console.log("Joined server '" + guild.name + "'.");
 	setUpServer(guild);
 });
 
+//Leave Server
 bot.on('guildDelete', guild => {
 	console.log("Whoa whoa whoa I just got kicked from " + guild.name);
 });
+
+/* Commands */
 
 var commands = {
 	"wiktor": {
@@ -142,12 +151,12 @@ var commands = {
 	},
 	"reminder": {
 		usage: [
-			"add <time/date>",
+			"add <time/date> [-m <message>]",
 			"remove <#/all>",
 			"list"
 		],
 		description: [
-			"Add a reminder that will remind you until either <time> has passed or remind you on <date>.",
+			"Add a reminder that will remind you until either <time> has passed or remind you on <date>. Optional message after token [-m].",
 			"Remove the reminder with list #<#> or remove <all> reminders.",
 			"List all reminders"
 		],
@@ -226,7 +235,7 @@ var commands = {
 					}
 					Storage["servers"][server]["channels"]["wednesday"] = channel.id;
 					msg.channel.send("Channel for Wednesdays has been set to " + channel);
-					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+					saveVars();
 				} else {
 					let channelID = Storage["servers"][server]["channels"]["wednesday"];
 					let channel = bot.channels.get(channelID);
@@ -237,18 +246,18 @@ var commands = {
 				server = msg.guild.id;
 				Storage.servers[server].disabledFeatures.wednesday = false;
 				msg.channel.send("Wednesdaily frog has been enabled. :frog:");
-				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+				saveVars();
 			}
 			if (args[0] == "disable") {
 				server = msg.guild.id;
 				Storage.servers[server].disabledFeatures.wednesday = true;
 				msg.channel.send("Wednesdaily frog has been disabled. <:tairaOOF:455716045987250186>");
-				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+				saveVars();
 			}
 			if (args[0] == "subscribe" || args[0] == "unsubscribe") {
 				if (!Storage.users.hasOwnProperty(author)) {
 					Storage.users[author] = {};
-					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+					saveVars();
 				}
 			}
 			if (args[0] == "subscribe") {
@@ -257,14 +266,14 @@ var commands = {
 				} else {
 					Storage.users[author].wednesday = true;
 					msg.channel.send("You are now subscribed to the private Wednesday service.");
-					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+					saveVars();
 				}
 			}
 			if (args[0] == "unsubscribe") {
 				if (Storage.users[author].wednesday == true) {
 					Storage.users[author].wednesday = false;
 					msg.channel.send("You are no longer subscribed to the private Wednesday service.");
-					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+					saveVars();
 				} else {
 					msg.channel.send("You are not subscribed to the private Wednesday service.");
 				}
@@ -318,7 +327,7 @@ var commands = {
 					let newPrefix = suffix.substring("prefix ".length);
 					Storage.prefix = newPrefix;
 					msg.channel.send("Bot prefix has been set to `" + newPrefix + "`.");
-					fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+					saveVars();
 					updatePresence();
 				}
 
@@ -335,7 +344,7 @@ var commands = {
 					if (typeof newValue != "undefined") {
 						Storage.debug = args[1];
 						msg.channel.send("`debug` has been set to `" + args[1] + "`.");
-						fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
+						saveVars();
 					} else {
 						msg.channel.send("Excuse me, what the frick?").then((message => message.delete(5000)));
 					}
@@ -387,6 +396,10 @@ function setUpServer(server) {
 		console.log("Added disabledFeatures property.");
 		Storage.servers[server.id].disabledFeatures = {};
 	}
+}
+
+function saveVars() {
+	fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 }
 
 function sendWednesday(channelID) {
