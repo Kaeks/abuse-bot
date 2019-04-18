@@ -402,8 +402,7 @@ var commands = {
 				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 				console.log(Storage.users);
 				msg.channel.send("Welcome to the water club, " + msg.author + "!\nYou will be notified every " + WATER_INTERVAL + " minutes (default value).");
-				addWaterTimer(user.id);
-				startWaterTimer(user.id);
+				addWaterTimer(user.id, Storage.users[user.id].water.interval);
 				break;
 
 				case "leave":
@@ -414,6 +413,7 @@ var commands = {
 				Storage.users[user.id].water.enabled = false;
 				saveVars()
 				msg.channel.send("You have left the water club. Sad to see you go! :(");
+				stopWaterTimer(user.id);
 				break;
 
 				case "interval":
@@ -506,23 +506,6 @@ var commands = {
 			}
 		}
 	},
-	"embedtest": {
-		process: function(bot, msg, suffix) {
-			let embed = new Discord.RichEmbed()
-				.setTitle("Title")
-				.setAuthor("Author", "https://cdn.discordapp.com/attachments/269556649952280576/516366500576362502/Z.png")
-				.setColor(0x00AE86)
-				.setDescription("Main Text 2048char")
-				.setFooter("Footer 2048char", "https://cdn.discordapp.com/attachments/269556649952280576/516366500576362502/Z.png")
-				.setImage("https://cdn.discordapp.com/attachments/269556649952280576/516366500576362502/Z.png")
-				.setThumbnail("https://cdn.discordapp.com/attachments/269556649952280576/516366500576362502/Z.png")
-				.addField("Field Title 256char", "Field Value 2048char")
-				.addField("Inline Field 256char", "Inline Field Value 2048char", true)
-				.addBlankField(true)
-				.addField("Max of 25 Fields", "hi", true);
-			msg.channel.send({embed});
-		}
-	},
 	"f": {
 		usage: "",
 		description: "Pay respects.",
@@ -559,6 +542,8 @@ function startAllWaterTimers() {
 
 function startWaterTimer(user) {
 	let now = (new Date()).getTime();
+	console.log("[startWaterTimer]: " + waterTimers[user]);
+	console.log(waterTimers);
 	let curTimer = setInterval(function() {
 		sendWater(user);
 	}, waterTimers[user] * 60000);
@@ -574,6 +559,7 @@ function stopWaterTimer(user) {
 		return false;
 	}
 	clearInterval(runningTimers[user].timer);
+	runningTimers[user] = null;
 }
 
 function updateWaterTimer(user) {
