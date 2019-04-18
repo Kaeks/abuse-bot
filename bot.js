@@ -402,6 +402,8 @@ var commands = {
 				fs.writeFileSync("./vars.json", JSON.stringify(Storage, null, 2));
 				console.log(Storage.users);
 				msg.channel.send("Welcome to the water club, " + msg.author + "!\nYou will be notified every " + WATER_INTERVAL + " minutes (default value).");
+				addWaterTimer(user.id);
+				startWaterTimer(user.id);
 				break;
 
 				case "leave":
@@ -568,6 +570,9 @@ function startWaterTimer(user) {
 }
 
 function stopWaterTimer(user) {
+	if (runningTimers[user] == null) {
+		return false;
+	}
 	clearInterval(runningTimers[user].timer);
 }
 
