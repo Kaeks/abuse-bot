@@ -582,6 +582,8 @@ async function sendDM(user, message) {
 
 function sendWater(user) {
 	let actualUser = bot.users.get(user);
+	let now = (new Date()).getTime();
+	runningTimers[user].started = now;
 	if (actualUser.presence.status == "offline" || actualUser.presence.status == "dnd") {
 		return;
 	}
