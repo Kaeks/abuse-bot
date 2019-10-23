@@ -5,3 +5,5 @@ vars.json
 package-lock.json
 package.json
 blocked_users.json
+*.iml
+.idea/
