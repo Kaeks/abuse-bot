@@ -25,61 +25,43 @@ try {
 	fs.writeFileSync('./blocked_users.json', JSON.stringify(Blocked, null, 2));
 }
 
-if (!Blocked.hasOwnProperty('users')) {
-	Blocked.users = [];
-}
-
-if (!Storage.hasOwnProperty('prefix')) {
-	Storage.prefix = '!';
-}
-
-if (!Storage.hasOwnProperty('debug')) {
-	Storage.debug = true;
-}
-
-if (!Storage.hasOwnProperty('servers')) {
-	Storage.servers = {};
-}
-
-if (!Storage.hasOwnProperty('users')) {
-	Storage.users = {};
-}
-
-if (!Storage.hasOwnProperty('reminders')) {
-	Storage.reminders = [];
-}
+Blocked.users = Blocked.users || [];
+Storage.prefix = Storage.prefix || '!';
+Storage.debug = Storage.debug || true;
+Storage.servers = Storage.servers || {};
+Storage.users = Storage.users || {};
+Storage.reminders = Storage.reminders || [];
 
 for (let server in Storage.servers) {
 	if (Storage.servers.hasOwnProperty(server)) {
-		if (!Storage.servers[server].hasOwnProperty('channels')) {
-			Storage.servers[server].channels = {};
-		}
-		if (!Storage.servers[server].hasOwnProperty('disabledFeatures')) {
-			Storage.servers[server].disabledFeatures = {};
-		}
+			Storage.servers[server].channels = Storage.servers[server].channels || {};
+			Storage.servers[server].disabledFeatures = Storage.servers[server].disabledFeatures || {};
 	}
 }
 
 saveVars();
 fs.writeFileSync('./blocked_users.json', JSON.stringify(Blocked, null, 2));
 
-new CronJob('0 0 * * 3', async function() {
-	for (let server in Storage.servers) {
-		if (Storage.servers.hasOwnProperty(server)) {
-			if (Storage.servers[server].channels.hasOwnProperty('wednesday')) {
-				if (Storage.servers[server].disabledFeatures.wednesday !== true) {
-					let channel = Storage.servers[server].channels.wednesday;
+let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
+	let servers = Storage.servers;
+	for (let server in servers) {
+		if (servers.hasOwnProperty(server)) {
+			let cur = servers[server];
+			if (cur.channels.hasOwnProperty('wednesday')) {
+				if (cur.disabledFeatures.wednesday !== true) {
+					let channel = cur.channels.wednesday;
 					sendWednesday(channel);
 				}
 			}
 		}
 	}
 	for (let user in Storage.users) {
-		if (Storage.users.hasOwnProperty(user)) {
-			if (Storage.users[user].hasOwnProperty('wednesday')) {
-				if (Storage.users[user].wednesday === true) {
-					let cur = bot.users.get(user);
-					let channel = await cur.createDM();
+		let users = Storage.users;
+		if (users.hasOwnProperty(user)) {
+			let cur = users[user];
+			if (cur.hasOwnProperty('wednesday')) {
+				if (cur.wednesday === true) {
+					let channel = await bot.users.get(user).createDM();
 					sendWednesday(channel.id);
 				}
 			}
@@ -122,7 +104,6 @@ bot.on('message', msg => {
 		}*/
 		return;
 	}
-	console.log('normal things happened');
 });
 
 // ADDED TO SERVER
@@ -275,14 +256,12 @@ let commands = {
 					} else {
 						channel = msg.channel;
 					}
-					if (!Storage['servers'][server].hasOwnProperty('channels')) {
-						Storage['servers'][server]['channels'] = {};
-					}
-					Storage['servers'][server]['channels']['wednesday'] = channel.id;
+					Storage.servers[server].channels = Storage.servers[server].channels || {};
+					Storage.servers[server].channels.wednesday = channel.id;
 					msg.channel.send('Channel for Wednesdays has been set to ' + channel);
 					saveVars();
 				} else {
-					let channelID = Storage['servers'][server]['channels']['wednesday'];
+					let channelID = Storage.servers[server].channels.wednesday;
 					let channel = bot.channels.get(channelID);
 					msg.channel.send('Channel for Wednesdays is ' + channel);
 				}
@@ -334,7 +313,7 @@ let commands = {
 				if (msg.channel.type === 'text') {
 					server = msg.guild.id;
 					if (Storage.servers[server].channels.hasOwnProperty('wednesday')) {
-						if (Storage.servers[server].disabledFeatures.wednesday === false || Storage.servers[server].disabledFeatures.wednesday === undefined) {
+						if (Storage.servers[server].disabledFeatures.wednesday !== true) {
 							let channelID = Storage.servers[server].channels.wednesday;
 							sendWednesday(channelID);
 						} else {
@@ -743,6 +722,10 @@ function checkMessageForCommand(msg) {
 
 			let eatAss = msg.content.match(/(eat.*ass)/i);
 			let ummah = msg.content.match(/u((mah+)|(m{2,}ah*))/i);
+			if (msg.mentions.everyone) {
+				msg.channel.send("@everyone" + "? Really? " + "@everyone" + "? Why would you ping " + "@everyone" + ", " + msg.author + "?");
+				return;
+			}
 			if (msg.isMentioned(bot.user)) {
 				if (ummah) {
 					if (eatAss) {
