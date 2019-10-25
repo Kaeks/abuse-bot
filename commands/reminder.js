@@ -10,7 +10,7 @@ module.exports = {
 		'Remove the reminder with list #<#> or remove <all> reminders.',
 		'List all reminders'
 	],
-	process : function(_, msg, suffix) {
+	execute(msg, suffix) {
 		if (suffix === '') {
 			msg.channel.send(getHelpEmbed('reminder'));
 		}
@@ -18,7 +18,7 @@ module.exports = {
 		let subCmd = args[0];
 		if (subCmd === 'add') {
 			let regexString = suffix.match(/(?:add) (.*)(?:-m (.*))/i);
-			debugLog(regexString);
+			common.debugLog(regexString);
 			let date = Date.parse(regexString[1]);
 			let task = regexString[2];
 			let msgLink = 'http://discordapp.com/channels/' + ((msg.channel.type === 'text') ? msg.guild.id : '@me') + '/' + msg.channel.id + '/' + msg.id;
@@ -28,7 +28,7 @@ module.exports = {
 				'msgLink' : msgLink,
 				'task' : task
 			});
-			debugLog(Storage.reminders);
+			common.debugLog(Storage.reminders);
 			saveVars();
 			let embed = new Discord.RichEmbed()
 				.setTitle('Reminder set!')

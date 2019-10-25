@@ -1,3 +1,5 @@
+const common = require('../common.js');
+const Storage = require('../data.json');
 module.exports = {
 	name: 'config',
 	usage: [
@@ -12,7 +14,7 @@ module.exports = {
 		'View debug logging',
 		'Enable/disable debug logging'
 	],
-		process: function(_, msg, suffix) {
+	execute(msg, suffix) {
 		if (suffix === '') {
 			msg.channel.send(getHelpEmbed('config'));
 		}
@@ -25,7 +27,7 @@ module.exports = {
 				Storage.prefix = newPrefix;
 				msg.channel.send('Bot prefix has been set to `' + newPrefix + '`.');
 				saveVars();
-				updatePresence();
+				msg.client.updatePresence();
 			}
 
 		} else if (args[0] === 'debug') {

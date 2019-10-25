@@ -1,3 +1,5 @@
+const common = require('../common.js');
+const Storage = require('../data.json');
 module.exports = {
 	name : 'wednesday',
 	usage : [
@@ -16,7 +18,7 @@ module.exports = {
 		'Subscribe to/unsubscribe from the private Wednesday service.',
 		'Simulate a Wednesday.'
 	],
-	process : function(_, msg, suffix) {
+	execute(msg, suffix) {
 		let args = suffix.split(' ');
 		if (args[0] === '') {
 			let embed = new Discord.RichEmbed()

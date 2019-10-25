@@ -1,3 +1,4 @@
+const common = require('../common.js');
 module.exports = {
 	name: 'ping',
 	description: [

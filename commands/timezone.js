@@ -1,3 +1,5 @@
+const common = require('../common.js');
+const Storage = require('../data.json');
 module.exports = {
 	name: 'timezone',
 	usage: [
@@ -8,7 +10,7 @@ module.exports = {
 		'Display your current set time zone.',
 		'Set a new time zone. (Format: +/-HHMM)'
 	],
-		process: function(_, msg, suffix) {
+	execute(msg, suffix) {
 		if (suffix === '') {
 			getTimeZone(msg.author);
 		}

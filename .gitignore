@@ -1,7 +1,7 @@
 node_modules/
-auth.json
 start.sh
-vars.json
+data.json
+config.json
 package-lock.json
 package.json
 blocked_users.json
