@@ -1,6 +1,7 @@
 const common = require('../common.js');
 const Discord = require('discord.js');
 const { prefix } = require('../config.json');
+
 module.exports = {
 	name: 'help',
 	usage: [
@@ -14,6 +15,8 @@ module.exports = {
 	execute(msg, args) {
 		const { commands } = msg.client;
 
+		let embed = new Discord.RichEmbed().setColor(0x00AE86);
+
 		if (!args.length) {
 			console.log(commands);
 		} else {
@@ -21,12 +24,12 @@ module.exports = {
 			common.debugLog('commandName: ' + commandName);
 			if (!commands.has(commandName)) return false;
 			const command = commands.get(commandName);
-			logCommand(command);
+			embed = embed.setTitle('Help for ' + prefix + commandName)
+				.setDescription(logCommand(command));
 		}
+		msg.channel.send({embed});
 
 		/*
-		let embed = new Discord.RichEmbed().setColor(0x00AE86);
-
 		if (!args.length) {
 			embed = embed.setTitle('Available Commands');
 			for (let command in commands) {
@@ -42,34 +45,63 @@ module.exports = {
 	}
 };
 
-function logCommand(command, commandChain) {
-	commandChain = commandChain || [];
-	commandChain.push(command);
-	for (let property in command) {
-		if (!command.hasOwnProperty(property)) continue;
-		if (property === 'sub') {
-			let subs = command[property];
-			for (let sub in subs) {
-				if (!subs.hasOwnProperty(sub)) continue;
-				logCommand(subs[sub]);
-			}
-		} else {
-			console.log(property + ': ' + command[property]);
-		}
+function combineCommandChain(commandChain) {
+	let commandString = '';
+	for (let i = 0; i < commandChain.length; i++) {
+		commandString += commandChain[i].name;
+		if (i < commandChain.length - 1) commandString += ' ';
 	}
+	return commandString;
 }
 
-function getPartialHelp() {
-	let temp = '';
-	let usage = commands[cmd].usage;
-	let description = commands[cmd].description;
+function logCommand(command, commandChain) {
+	//TODO fix infinite chaining of commands in the chain between different commands of a list of subcommands
+	console.log(commandChain);
+	let localCommandChain = commandChain || [];
+	console.log(localCommandChain);
+	localCommandChain.push(command);
+	let theEntireText = '';
 
-	for (let i = 0; i < usage.length; i++) {
-		temp += '`' + prefix + cmd + ' ' + usage[i] + '`';
-		if (description[i]) {
-			temp += '\n-- ' + description[i];
+	let commandString = combineCommandChain(localCommandChain);
+
+	let hasUsage = command.hasOwnProperty('usage');
+	let hasDesc = command.hasOwnProperty('description');
+
+	let usageIsArray = hasUsage ? command.usage instanceof Array : undefined;
+	let descIsArray = hasDesc ? command.usage instanceof Array : undefined;
+
+	let usageIsString = hasUsage ? typeof command.usage === 'string' : undefined;
+	let descIsString = hasDesc ? typeof command.usage === 'string' : undefined;
+
+	if (hasUsage) {
+		if (hasDesc) {
+			if (usageIsString && descIsString) {
+				theEntireText += `\` ${prefix + commandString} ${command.usage}\`\n-- ${command.description}\n`;
+			} else if (usageIsArray && descIsArray) {
+				if (command.usage.length === command.description.length) {
+					for (let i = 0; i < command.usage.length; i++) {
+						theEntireText += `\` ${prefix + commandString} ${command.usage[i]}\`\n-- ${command.description[i]}\n`;
+					}
+				} else common.warn(`Lengths of usage and description properties of command '${commandString}' do not match.`);
+			} else common.warn(`Types of usage and description properties of command '${commandString}' do not match.`);
+		} else {
+			if (usageIsString) {
+				theEntireText += `\` ${prefix + commandString} ${command.usage}\`\n`;
+			} else if (usageIsArray) {
+				for (let i = 0; i < command.usage.length; i++) {
+					theEntireText += `\` ${prefix + commandString} ${command.usage[i]}\`\n`;
+				}
+			}
+			common.info(`Command '${commandString}' has usage property, but no description property.`)
 		}
-		temp += '\n';
+	} else if (!(command.hasOwnProperty('args') && command.args)) common.info(`Command '${commandString}' doesn't have a usage property.`);
+
+	if (command.hasOwnProperty('sub')) {
+		let subs = command.sub;
+		for (let sub in subs) {
+			if (!subs.hasOwnProperty(sub)) continue;
+			theEntireText += logCommand(subs[sub], localCommandChain);
+		}
 	}
-	return temp;
+	return theEntireText;
 }

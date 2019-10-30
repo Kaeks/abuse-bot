@@ -29,7 +29,7 @@ module.exports = {
 				'task' : task
 			});
 			common.debugLog(Storage.reminders);
-			saveVars();
+			writeData();
 			let embed = new Discord.RichEmbed()
 				.setTitle('Reminder set!')
 				.setDescription('I will remind you about [this message](<' + msgLink + '>) on ' + date + '.')
@@ -43,7 +43,7 @@ module.exports = {
 						Storage.reminders[i] = null;
 					}
 				}
-				saveVars();
+				writeData();
 			}
 		} else if (subCmd === 'list') {
 			let tempReminders = [];

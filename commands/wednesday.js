@@ -1,23 +1,51 @@
 const common = require('../common.js');
+const Discord = require('discord.js');
 const Storage = require('../data.json');
+
 module.exports = {
 	name : 'wednesday',
-	usage : [
-		'',
-		'enable/disable',
-		'channel',
-		'channel set [textChannel]',
-		'subscribe/unsubscribe',
-		'test'
+	sub : [
+		{
+			name : 'enable',
+			usage : '',
+			description : 'Enable Wednesday posting.'
+		},
+		{
+			name : 'disable',
+			usage : '',
+			description : 'Enable/disable Wednesday posting.'
+		},
+		{
+			name : 'channel',
+			sub : [
+				{
+					name: 'set',
+					usage: '[textChannel]',
+					description: 'Set channel for Wednesdays.'
+				}
+			],
+			usage : '',
+			description : 'View channel for Wednesdays.'
+		},
+		{
+			name : 'subscribe',
+			usage : '',
+			description: 'Subscribe to the private Wednesday service.'
+		},
+		{
+			name : 'unsubscribe',
+			usage : '',
+			description: 'Unsubscribe from the private Wednesday service.'
+		},
+		{
+			name : 'test',
+			usage : '',
+			description: 'Simulate a Wednesday.'
+		},
 	],
-	description : [
-		'It is Wednesday, my dudes.',
-		'Enable/disable Wednesday posting.',
-		'View channel for Wednesdays.',
-		'Set channel for Wednesdays.',
-		'Subscribe to/unsubscribe from the private Wednesday service.',
-		'Simulate a Wednesday.'
-	],
+	usage : '',
+	description : 'It is Wednesday, my dudes.',
+
 	execute(msg, suffix) {
 		let args = suffix.split(' ');
 		if (args[0] === '') {
@@ -48,7 +76,7 @@ module.exports = {
 				Storage.servers[server].channels = Storage.servers[server].channels || {};
 				Storage.servers[server].channels.wednesday = channel.id;
 				msg.channel.send('Channel for Wednesdays has been set to ' + channel);
-				saveVars();
+				writeData();
 			} else {
 				let channelID = Storage.servers[server].channels.wednesday;
 				let channel = bot.channels.get(channelID);
@@ -59,18 +87,18 @@ module.exports = {
 			server = msg.guild.id;
 			Storage.servers[server].disabledFeatures.wednesday = false;
 			msg.channel.send('Wednesdaily frog has been enabled. :frog:');
-			saveVars();
+			writeData();
 		}
 		if (args[0] === 'disable') {
 			server = msg.guild.id;
 			Storage.servers[server].disabledFeatures.wednesday = true;
 			msg.channel.send('Wednesdaily frog has been disabled. <:tairaOOF:455716045987250186>');
-			saveVars();
+			writeData();
 		}
 		if (args[0] === 'subscribe' || args[0] === 'unsubscribe') {
 			if (!Storage.users.hasOwnProperty(author)) {
 				Storage.users[author] = {};
-				saveVars();
+				writeData();
 			}
 		}
 		if (args[0] === 'subscribe') {
@@ -79,14 +107,14 @@ module.exports = {
 			} else {
 				Storage.users[author].wednesday = true;
 				msg.channel.send('You are now subscribed to the private Wednesday service.');
-				saveVars();
+				writeData();
 			}
 		}
 		if (args[0] === 'unsubscribe') {
 			if (Storage.users[author].wednesday === true) {
 				Storage.users[author].wednesday = false;
 				msg.channel.send('You are no longer subscribed to the private Wednesday service.');
-				saveVars();
+				writeData();
 			} else {
 				msg.channel.send('You are not subscribed to the private Wednesday service.');
 			}

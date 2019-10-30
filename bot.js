@@ -25,7 +25,7 @@ try {
 	Storage = require('./data.json');
 	common.debugLog('Read data.json');
 } catch (e) {
-	saveVars();
+	writeData();
 }
 
 let Blocked = {};
@@ -42,7 +42,7 @@ Storage.servers = Storage.servers || {};
 Storage.users = Storage.users || {};
 Storage.reminders = Storage.reminders || [];
 
-saveVars();
+writeData();
 fs.writeFileSync('./blocked_users.json', JSON.stringify(Blocked, null, 2));
 
 let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
@@ -70,7 +70,7 @@ let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
 // START
 client.on('ready', () => {
 	console.log('*hacker voice* I\'m in.');
-	console.log(client.user.username);
+	console.log(`Agent ${client.user.username} signing in.`);
 	updatePresence();
 
 	console.log(Date.now().toString());
@@ -86,7 +86,7 @@ client.on('ready', () => {
 	common.debugLog(runningTimers);
 
 	common.debugLog(Storage);
-	saveVars();
+	writeData();
 
 });
 
@@ -227,7 +227,7 @@ function setUpServer(server) {
 	}
 	Storage.servers[server.id].channels = Storage.servers[server.id].channels || {};
 	Storage.servers[server.id].disabledFeatures = Storage.servers[server.id].disabledFeatures || {};
-	saveVars();
+	writeData();
 }
 
 function setUpUser(user) {
@@ -238,10 +238,10 @@ function setUpUser(user) {
 	Storage.users[user.id].wednesday = Storage.users[user.id].wednesday || {};
 	Storage.users[user.id].water = Storage.users[user.id].water || {};
 	Storage.users[user.id].timeZone = Storage.users[user.id].timeZone || '+0100';
-	saveVars();
+	writeData();
 }
 
-function saveVars() {
+function writeData() {
 	fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
 }
 

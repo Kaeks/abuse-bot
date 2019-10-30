@@ -1,19 +1,23 @@
 const common = require('../common.js');
 const Storage = require('../data.json');
+
 module.exports = {
 	name: 'water',
 	args: true,
 	sub: [
 		{
 			name: 'status',
+			usage: '',
 			description: 'Display your current water status.'
 		},
 		{
 			name: 'join',
+			usage: '',
 			description: 'Join the water club.'
 		},
 		{
 			name: 'leave',
+			usage: '',
 			description: 'Leave the water club.'
 		},
 		{
@@ -22,17 +26,13 @@ module.exports = {
 				{
 					name: 'set',
 					args: true,
+					usage: '<minutes>',
 					description: 'Set a new interval'
 				}
 			],
+			usage: '',
 			description: 'Display your current interval'
 		}
-	],
-	usage: [
-		'status',
-		'join',
-		'leave',
-		'interval [set <minutes>]'
 	],
 	execute(msg, suffix) {
 		if (suffix === '') {
@@ -87,7 +87,7 @@ module.exports = {
 					break;
 				}
 				Storage.users[user.id].water.enabled = false;
-				saveVars();
+				writeData();
 				msg.channel.send('You have left the water club. Sad to see you go! :(');
 				stopWaterTimer(user.id);
 				break;
@@ -105,7 +105,7 @@ module.exports = {
 							if (parseInt(newIntervalString, 10) > 0 ) {
 								let newInterval = parseInt(newIntervalString, 10);
 								Storage.users[user.id].water.interval = newInterval;
-								saveVars();
+								writeData();
 								msg.channel.send('Water interval has been set to ' + newInterval + ' minutes.');
 								common.debugLog(waterTimers);
 								common.debugLog(runningTimers);

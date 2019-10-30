@@ -1,8 +1,16 @@
 const { debug } = require('./data.json');
 
 module.exports = {
+	info(msg) {
+		console.log(`[INFO] ${msg}`);
+	},
+
+	warn(msg) {
+		console.log(`[WARN] ${msg}`);
+	},
+
 	debugLog(msg) {
-		if (debug) console.log(msg);
+		if (debug) console.log(`[DEBUG] ${msg}`);
 	},
 
 	unparseDate(date) {

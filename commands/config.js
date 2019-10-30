@@ -26,7 +26,7 @@ module.exports = {
 				let newPrefix = suffix.substring('prefix '.length);
 				Storage.prefix = newPrefix;
 				msg.channel.send('Bot prefix has been set to `' + newPrefix + '`.');
-				saveVars();
+				writeData();
 				msg.client.updatePresence();
 			}
 
@@ -37,7 +37,7 @@ module.exports = {
 				if (args[1] === 'true' || args[1] === 'false') {
 					Storage.debug = args[1];
 					msg.channel.send('`debug` has been set to `' + args[1] + '`.');
-					saveVars();
+					writeData();
 				} else {
 					msg.channel.send('Excuse me, what the frick?').then((message => message.delete(3000)));
 				}
