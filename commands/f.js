@@ -1,12 +1,10 @@
 const common = require('../common.js');
+
 module.exports = {
-	name: 'f',
-	usage: [
-		''
-	],
-		description: [
-		'Pay respects.'
-	],
+	name : 'f',
+	args : common.argumentValues.NONE,
+	usage : '',
+	description : 'Pay respects.',
 	execute(msg, suffix) {
 		let embed = new Discord.RichEmbed()
 			.setColor(0x00AE86)

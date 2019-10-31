@@ -1,37 +1,42 @@
 const common = require('../common.js');
+const Discord = require('discord.js');
 const Storage = require('../data.json');
 
 module.exports = {
-	name: 'water',
-	args: true,
-	sub: [
+	name : 'water',
+	args : common.argumentValues.REQUIRED,
+	sub : [
 		{
-			name: 'status',
-			usage: '',
-			description: 'Display your current water status.'
+			name : 'status',
+			args : common.argumentValues.NONE,
+			usage : '',
+			description : 'Display your current water status.'
 		},
 		{
-			name: 'join',
-			usage: '',
-			description: 'Join the water club.'
+			name : 'join',
+			args : common.argumentValues.NONE,
+			usage : '',
+			description : 'Join the water club.'
 		},
 		{
-			name: 'leave',
-			usage: '',
-			description: 'Leave the water club.'
+			name : 'leave',
+			args : common.argumentValues.NONE,
+			usage : '',
+			description : 'Leave the water club.'
 		},
 		{
-			name: 'interval',
-			sub: [
+			name : 'interval',
+			args : common.argumentValues.OPTIONAL,
+			sub : [
 				{
-					name: 'set',
-					args: true,
-					usage: '<minutes>',
-					description: 'Set a new interval'
+					name : 'set',
+					args : common.argumentValues.REQUIRED,
+					usage : '<minutes>',
+					description : 'Set a new interval'
 				}
 			],
-			usage: '',
-			description: 'Display your current interval'
+			usage : '',
+			description : 'Display your current interval'
 		}
 	],
 	execute(msg, suffix) {
@@ -62,17 +67,17 @@ module.exports = {
 				const WATER_INTERVAL = 60;
 				Storage.users[user.id] = Storage.users[user.id] || {};
 				Storage.users[user.id].water = Storage.users[user.id].water || {};
-				common.debugLog(Storage.users);
+				common.debug(Storage.users);
 				if (Storage.users[user.id].water.enabled === true) {
 					msg.channel.send('You are already a member of the water club!');
 					break;
 				}
-				common.debugLog(Storage.users);
+				common.debug(Storage.users);
 				Storage.users[user.id].water.enabled = true;
 				Storage.users[user.id].water.interval = WATER_INTERVAL;
-				common.debugLog(Storage.users);
+				common.debug(Storage.users);
 				fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
-				common.debugLog(Storage.users);
+				common.debug(Storage.users);
 				msg.channel.send('Welcome to the water club, ' + msg.author + '!\nYou will be notified every ' + WATER_INTERVAL + ' minutes (default value).');
 				addWaterTimer(user.id, Storage.users[user.id].water.interval);
 				break;
@@ -107,11 +112,11 @@ module.exports = {
 								Storage.users[user.id].water.interval = newInterval;
 								writeData();
 								msg.channel.send('Water interval has been set to ' + newInterval + ' minutes.');
-								common.debugLog(waterTimers);
-								common.debugLog(runningTimers);
+								common.debug(waterTimers);
+								common.debug(runningTimers);
 								updateWaterTimer(user.id);
-								common.debugLog(waterTimers);
-								common.debugLog(runningTimers);
+								common.debug(waterTimers);
+								common.debug(runningTimers);
 							} else {
 								msg.channel.send('<interval> must be above 0.');
 							}

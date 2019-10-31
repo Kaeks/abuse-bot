@@ -23,7 +23,7 @@ let runningTimers = {};
 let Storage = {};
 try {
 	Storage = require('./data.json');
-	common.debugLog('Read data.json');
+	common.debug('Read data.json');
 } catch (e) {
 	writeData();
 }
@@ -31,7 +31,7 @@ try {
 let Blocked = {};
 try {
 	Blocked = require('./blocked_users.json');
-	common.debugLog('Read blocked_users.json');
+	common.debug('Read blocked_users.json');
 } catch (e) {
 	fs.writeFileSync('./blocked_users.json', JSON.stringify(Blocked, null, 2));
 }
@@ -73,19 +73,19 @@ client.on('ready', () => {
 	console.log(`Agent ${client.user.username} signing in.`);
 	updatePresence();
 
-	console.log(Date.now().toString());
+	common.debug(Date.now().toString());
 
 	for (let guild of client.guilds) {
 		setUpServer(guild[1]);
 	}
 
 	loadWaterTimers();
-	common.debugLog(waterTimers);
-	common.debugLog(runningTimers);
+	common.debug(waterTimers);
+	common.debug(runningTimers);
 	startAllWaterTimers();
-	common.debugLog(runningTimers);
+	common.debug(runningTimers);
 
-	common.debugLog(Storage);
+	common.debug(Storage);
 	writeData();
 
 });
@@ -95,7 +95,7 @@ client.on('message', msg => {
 	if (checkMessageForCommand(msg)) {
 		if (msg.channel.type !== 'dm' && msg.channel.type !== 'group') {
 			setTimeout(function() {
-				msg.delete().then(common.debugLog, console.error);
+				msg.delete().then(common.debug, console.error);
 			}, 3000);
 		}
 	} else {
@@ -169,8 +169,8 @@ function startAllWaterTimers() {
 
 function startWaterTimer(userId) {
 	let now = (new Date()).getTime();
-	common.debugLog('[startWaterTimer]: ' + waterTimers[userId]);
-	common.debugLog(waterTimers);
+	common.debug('[startWaterTimer]: ' + waterTimers[userId]);
+	common.debug(waterTimers);
 	let curTimer = setInterval(function() {
 		sendWater(userId);
 	}, waterTimers[userId] * 60000);
@@ -204,7 +204,7 @@ async function sendDM(userId, message) {
 	let cur = client.users.get(userId);
 	let channel = await cur.createDM();
 	channel.send(message)
-		.then(common.debugLog, console.error);
+		.then(common.debug, console.error);
 }
 
 function sendWater(userId) {
@@ -259,14 +259,56 @@ function updatePresence(status, name, type, url) {
 	type = type || 'LISTENING';
 	url = url || 'https://www.github.com/Kaeks/abuse-bot';
 	client.user.setStatus(status)
-		.then(common.debugLog, console.error);
+		.then(common.debug, console.error);
 	client.user.setPresence({
-		game: {
-			name: name,
-			type: type,
+		game : {
+			name : name,
+			type : type,
 			url: url
 		}
-	}).then(common.debugLog, console.error);
+	}).then(common.debug, console.error);
+}
+
+function findSubCommand(msg, suffix, command) {
+
+	let canExecute = false;
+
+	common.debug('SUFFIX: ' + suffix);
+	let splitList = suffix.split(' ');
+	common.debug('SPLIT LIST: ');
+	common.debug(splitList);
+	let firstArg = splitList[0];
+	common.debug('FIRST ARG: ' + firstArg);
+
+	if (firstArg === '') {
+		if (command.args !== common.argumentValues.REQUIRED) canExecute = true;
+	}
+
+	let newSuffix = suffix.substring(firstArg.length + 1);
+	common.debug('NEW SUFFIX: ' + newSuffix);
+
+	let subIndex = -1;
+
+	if (command.hasOwnProperty('sub')) {
+		for (let i = 0; i < command.sub.length; i++) {
+			if (command.sub[i].name === firstArg.toLowerCase()) {
+				subIndex = i;
+				break;
+			}
+		}
+	}
+
+	if (subIndex >= 0) findSubCommand(msg, newSuffix, command.sub[subIndex]);
+	else if (command.args === common.argumentValues.REQUIRED || command.args === common.argumentValues.OPTIONAL) canExecute = true;
+
+	if (canExecute) {
+		command.execute(msg, suffix);
+		return true;
+	} else {
+		// display help
+		console.log(common.getCommandHelp(command));
+	}
+	return false;
 }
 
 function checkMessageForCommand(msg) {
@@ -276,39 +318,32 @@ function checkMessageForCommand(msg) {
 	if (!Storage.users.hasOwnProperty(msg.author.id)) setUpUser(msg.author);
 
 	// Filter out blocked users
-	for (let i = 0; i < Blocked.users.length; i++) {
-		if (msg.author.id === Blocked.users[i]) {
-			console.log('User is on blocked user list');
-			msg.channel.send('I\'m sorry, ' + msg.author + ', you\'ve been blocked from using me.');
-			return false;
-		}
+	if (Blocked.users.includes(msg.author.id)) {
+		console.log('User is on blocked user list');
+		msg.channel.send('I\'m sorry, ' + msg.author + ', you\'ve been blocked from using me.');
+		return false;
 	}
 
 	//	/([^\"\']\S*|\".+?\"|\'.+?\')\s*/g
 
 	const commandName = msg.content.slice(prefix.length).split(' ')[0].toLowerCase();
-	common.debugLog('commandName: ' + commandName);
+	common.debug('commandName: ' + commandName);
 	const suffix = msg.content.substring(commandName.length + prefix.length + 1);
-	common.debugLog('suffix: ' + suffix);
+	common.debug('suffix: ' + suffix);
 
 	if (!client.commands.has(commandName)) return false;
 
 	const command = client.commands.get(commandName);
 
-	if (command.args && !suffix.length) {
-		msg.channel.send('Too few arguments.');
-		return false;
-	}
-
 	try {
-		command.execute(msg, suffix);
+		findSubCommand(msg, suffix, command);
 		return true;
 	} catch (e) {
 		console.log(e.stack);
-		let msgText = 'Internal Error. Command `' + commandName + '` failed.';
-		msg.channel.send(msgText).then(common.debugLog, console.error);
+		msg.channel.send('Internal Error. Command `' + commandName + '` failed.').then(common.debug, console.error);
 	}
+	return false;
 }
 
 client.login(token)
-	.then(common.debugLog, console.error);
+	.then(common.debug, console.error);

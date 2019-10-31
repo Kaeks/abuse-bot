@@ -1,14 +1,37 @@
+const common = require('../common.js');
+const Discord = require('discord.js');
+const Storage = require('../data.json');
+
 module.exports = {
-	name: 'reminder',
-	usage : [
-		'add <time/date> [-m <message>]',
-		'remove <#/all>',
-		'list'
-	],
-	description : [
-		'Add a reminder that will remind you until either <time> has passed or remind you on <date>. Optional message after token [-m].',
-		'Remove the reminder with list #<#> or remove <all> reminders.',
-		'List all reminders'
+	name : 'reminder',
+	args : common.argumentValues.REQUIRED,
+	sub : [
+		{
+			name : 'add',
+			args : common.argumentValues.REQUIRED,
+			usage : '<time/date> [-m <message]',
+			description : 'Add a reminder that will remind you until either <time> has passed or remind you on <date>. Optional message after token [-m].'
+		},
+		{
+			name : 'remove',
+			args : common.argumentValues.REQUIRED,
+			sub : [
+				{
+					name : 'all',
+					args : common.argumentValues.NONE,
+					usage : '',
+					description : 'Remove all of your reminders.'
+				}
+			],
+			usage : '<#>',
+			description : 'Remove the reminder with list #<#>.',
+		},
+		{
+			name : 'list',
+			args : common.argumentValues.NONE,
+			usage : '',
+			description : 'List all reminders'
+		}
 	],
 	execute(msg, suffix) {
 		if (suffix === '') {
@@ -18,7 +41,7 @@ module.exports = {
 		let subCmd = args[0];
 		if (subCmd === 'add') {
 			let regexString = suffix.match(/(?:add) (.*)(?:-m (.*))/i);
-			common.debugLog(regexString);
+			common.debug(regexString);
 			let date = Date.parse(regexString[1]);
 			let task = regexString[2];
 			let msgLink = 'http://discordapp.com/channels/' + ((msg.channel.type === 'text') ? msg.guild.id : '@me') + '/' + msg.channel.id + '/' + msg.id;
@@ -28,7 +51,7 @@ module.exports = {
 				'msgLink' : msgLink,
 				'task' : task
 			});
-			common.debugLog(Storage.reminders);
+			common.debug(Storage.reminders);
 			writeData();
 			let embed = new Discord.RichEmbed()
 				.setTitle('Reminder set!')

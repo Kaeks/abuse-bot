@@ -4,24 +4,29 @@ const Storage = require('../data.json');
 
 module.exports = {
 	name : 'wednesday',
+	args : common.argumentValues.OPTIONAL,
 	sub : [
 		{
 			name : 'enable',
+			args : common.argumentValues.NONE,
 			usage : '',
 			description : 'Enable Wednesday posting.'
 		},
 		{
 			name : 'disable',
+			args : common.argumentValues.NONE,
 			usage : '',
 			description : 'Enable/disable Wednesday posting.'
 		},
 		{
 			name : 'channel',
+			args : common.argumentValues.OPTIONAL,
 			sub : [
 				{
-					name: 'set',
-					usage: '[textChannel]',
-					description: 'Set channel for Wednesdays.'
+					name : 'set',
+					args : common.argumentValues.OPTIONAL,
+					usage : '[textChannel]',
+					description : 'Set channel for Wednesdays.'
 				}
 			],
 			usage : '',
@@ -29,18 +34,21 @@ module.exports = {
 		},
 		{
 			name : 'subscribe',
+			args : common.argumentValues.NONE,
 			usage : '',
-			description: 'Subscribe to the private Wednesday service.'
+			description : 'Subscribe to the private Wednesday service.'
 		},
 		{
 			name : 'unsubscribe',
+			args : common.argumentValues.NONE,
 			usage : '',
-			description: 'Unsubscribe from the private Wednesday service.'
+			description : 'Unsubscribe from the private Wednesday service.'
 		},
 		{
 			name : 'test',
+			args : common.argumentValues.NONE,
 			usage : '',
-			description: 'Simulate a Wednesday.'
+			description : 'Simulate a Wednesday.'
 		},
 	],
 	usage : '',

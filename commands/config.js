@@ -1,18 +1,35 @@
 const common = require('../common.js');
+const Discord = require('discord.js');
 const Storage = require('../data.json');
+
 module.exports = {
-	name: 'config',
-	usage: [
-		'prefix',
-		'prefix <newPrefix>',
-		'debug',
-		'debug <true|false>'
-	],
-	description: [
-		'View prefix',
-		'Set new prefix',
-		'View debug logging',
-		'Enable/disable debug logging'
+	name : 'config',
+	args : common.argumentValues.REQUIRED,
+	sub : [
+		{
+			name : 'prefix',
+			args : common.argumentValues.OPTIONAL,
+			usage : [
+				'',
+				'<newPrefix>'
+			],
+			description : [
+				'View prefix',
+				'Set new prefix'
+			]
+		},
+		{
+			name : 'debug',
+			args : common.argumentValues.OPTIONAL,
+			usage : [
+				'',
+				'<true|false>'
+			],
+			description : [
+				'View debug logging',
+				'Enable/disable debug logging'
+			]
+		}
 	],
 	execute(msg, suffix) {
 		if (suffix === '') {

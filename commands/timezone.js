@@ -1,15 +1,18 @@
 const common = require('../common.js');
 const Storage = require('../data.json');
 module.exports = {
-	name: 'timezone',
-	usage: [
-		'',
-		'set <time zone>'
+	name : 'timezone',
+	args : common.argumentValues.OPTIONAL,
+	sub : [
+		{
+			name : 'set',
+			args : common.argumentValues.REQUIRED,
+			usage : '<timezone>',
+			description : 'Set a new time zone. (Format: +/-HHMM)'
+		}
 	],
-		description: [
-		'Display your current set time zone.',
-		'Set a new time zone. (Format: +/-HHMM)'
-	],
+	usage :	'',
+	description : 'Display your current set time zone.',
 	execute(msg, suffix) {
 		if (suffix === '') {
 			getTimeZone(msg.author);
