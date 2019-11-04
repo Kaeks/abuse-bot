@@ -1,5 +1,4 @@
-const { debug } = require('./data.json');
-const { prefix } = require('./config.json');
+const { debug, prefix } = require('./config.json');
 
 module.exports = {
 
@@ -18,7 +17,14 @@ module.exports = {
 	},
 
 	debug(msg) {
-		if (debug) console.log('\x1b[36m%s\x1b[0m', `[DEBUG] ${msg}`);
+		if (debug) {
+			if (msg instanceof Object) {
+				console.log('\x1b[36m%s\x1b[0m', '[DEBUG]');
+				console.log(msg);
+			} else {
+				console.log('\x1b[36m%s\x1b[0m', `[DEBUG] ${msg}`);
+			}
+		}
 	},
 
 	unparseDate(date) {

@@ -1,5 +1,6 @@
 const common = require('../common.js');
 const Discord = require('discord.js');
+const Config = require('../config.json');
 const Storage = require('../data.json');
 
 module.exports = {
@@ -52,7 +53,7 @@ module.exports = {
 				msg.channel.send('`debug` is set to `' + Storage.debug + '`.');
 			} else {
 				if (args[1] === 'true' || args[1] === 'false') {
-					Storage.debug = args[1];
+					Config.debug = args[1];
 					msg.channel.send('`debug` has been set to `' + args[1] + '`.');
 					writeData();
 				} else {

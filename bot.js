@@ -25,25 +25,44 @@ try {
 	Storage = require('./data.json');
 	common.debug('Read data.json');
 } catch (e) {
-	writeData();
+	fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
 }
 
-let Blocked = {};
+let Blocked = [];
 try {
 	Blocked = require('./blocked_users.json');
 	common.debug('Read blocked_users.json');
 } catch (e) {
 	fs.writeFileSync('./blocked_users.json', JSON.stringify(Blocked, null, 2));
+	common.info('Created blocked_users.json');
 }
 
-Blocked.users = Blocked.users || [];
-Storage.debug = Storage.debug || true;
+let Deleted = [];
+try {
+	Deleted = require('./deleted_messages.json');
+	common.debug('Read deleted_messages.json');
+} catch (e) {
+	fs.writeFileSync('./deleted_messages.json', JSON.stringify(Deleted, null, 2));
+	common.info('Created deleted_messages.json');
+}
+
+let Edited = [];
+try {
+	Edited = require('./edited_messages.json');
+	common.debug('Read edited_messages.json');
+} catch (e) {
+	fs.writeFileSync('./edited_messages.json', JSON.stringify(Edited, null, 2));
+	common.info('Created edited_messages.json');
+}
+
 Storage.servers = Storage.servers || {};
 Storage.users = Storage.users || {};
 Storage.reminders = Storage.reminders || [];
 
-writeData();
+fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
 fs.writeFileSync('./blocked_users.json', JSON.stringify(Blocked, null, 2));
+fs.writeFileSync('./deleted_messages.json', JSON.stringify(Deleted, null, 2));
+fs.writeFileSync('./edited_messages.json', JSON.stringify(Edited, null, 2));
 
 let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
 	for (let serverId in Storage.servers) {
@@ -73,7 +92,8 @@ client.on('ready', () => {
 	console.log(`Agent ${client.user.username} signing in.`);
 	updatePresence();
 
-	common.debug(Date.now().toString());
+	let now = new Date();
+	common.debug(now.toString());
 
 	for (let guild of client.guilds) {
 		setUpServer(guild[1]);
@@ -86,7 +106,7 @@ client.on('ready', () => {
 	common.debug(runningTimers);
 
 	common.debug(Storage);
-	writeData();
+	fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
 
 });
 
@@ -127,6 +147,74 @@ client.on('message', msg => {
 			}
 		}
 	}
+});
+
+// MESSAGE DELETED
+client.on('messageDelete', message => {
+	if (message.author.bot) {
+		// discard
+		return false;
+	}
+	console.log('Message by ' + message.author + ' deleted.');
+	let shortened = {
+		id: message.id,
+		type: message.type,
+		content: message.content,
+		author: {
+			id: message.author.id,
+			username: message.author.username,
+			discriminator: message.author.discriminator
+		},
+		channel: {
+			type: message.channel.type,
+			id: message.channel.id,
+		}
+	};
+	if (message.embeds.length > 0) {
+		shortened.embeds = message.embeds;
+	}
+	if (message.attachments.size > 0) {
+		let shortenedAttachments = [];
+		message.attachments.forEach(function(value, key, map) {
+			shortenedAttachments.push(
+				{
+					id: value.id,
+					filename: value.filename,
+					url: value.url,
+					proxyURL: value.proxyURL
+				}
+			);
+		});
+		shortened.attachments = shortenedAttachments;
+	}
+	Deleted.push(shortened);
+	fs.writeFileSync('./deleted_messages.json', JSON.stringify(Deleted, null, 2));
+});
+
+// MESSAGE UPDATED
+client.on('messageUpdate', (oldMessage, newMessage) => {
+	if (oldMessage.author.bot) {
+		// discard
+		return false;
+	}
+	console.log('Message by ' + oldMessage.author + ' edited.');
+	let combinedEntry = {
+		id: oldMessage.id,
+		type: oldMessage.type,
+		oldContent: oldMessage.content,
+		newContent: newMessage.content,
+		author: {
+			id: oldMessage.author.id,
+			username: oldMessage.author.username,
+			discriminator: oldMessage.author.discriminator
+		},
+		channel: {
+			type: oldMessage.channel.type,
+			id: oldMessage.channel.id,
+		}
+	};
+	Edited.push(combinedEntry);
+	fs.writeFileSync('./edited_messages.json', JSON.stringify(Edited, null, 2));
 });
 
 // ADDED TO SERVER
@@ -227,7 +315,7 @@ function setUpServer(server) {
 	}
 	Storage.servers[server.id].channels = Storage.servers[server.id].channels || {};
 	Storage.servers[server.id].disabledFeatures = Storage.servers[server.id].disabledFeatures || {};
-	writeData();
+	fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
 }
 
 function setUpUser(user) {
@@ -238,10 +326,6 @@ function setUpUser(user) {
 	Storage.users[user.id].wednesday = Storage.users[user.id].wednesday || {};
 	Storage.users[user.id].water = Storage.users[user.id].water || {};
 	Storage.users[user.id].timeZone = Storage.users[user.id].timeZone || '+0100';
-	writeData();
-}
-
-function writeData() {
 	fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
 }
 
@@ -253,11 +337,7 @@ function sendWednesday(channelID) {
 	client.channels.get(channelID).send({embed});
 }
 
-function updatePresence(status, name, type, url) {
-	status = status || 'available';
-	name = name || prefix + 'help';
-	type = type || 'LISTENING';
-	url = url || 'https://www.github.com/Kaeks/abuse-bot';
+function updatePresence(status = 'online', name = prefix + 'help', type = 'LISTENING', url = 'https://www.github.com/Kaeks/wiktor-bot') {
 	client.user.setStatus(status)
 		.then(common.debug, console.error);
 	client.user.setPresence({
@@ -302,6 +382,7 @@ function findSubCommand(msg, suffix, command) {
 	else if (command.args === common.argumentValues.REQUIRED || command.args === common.argumentValues.OPTIONAL) canExecute = true;
 
 	if (canExecute) {
+		console.log('executing with this suffix: ' + suffix);
 		command.execute(msg, suffix);
 		return true;
 	} else {
@@ -318,7 +399,7 @@ function checkMessageForCommand(msg) {
 	if (!Storage.users.hasOwnProperty(msg.author.id)) setUpUser(msg.author);
 
 	// Filter out blocked users
-	if (Blocked.users.includes(msg.author.id)) {
+	if (Blocked.includes(msg.author.id)) {
 		console.log('User is on blocked user list');
 		msg.channel.send('I\'m sorry, ' + msg.author + ', you\'ve been blocked from using me.');
 		return false;
