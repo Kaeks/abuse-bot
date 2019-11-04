@@ -1,9 +1,20 @@
-node_modules/
+##local files
 start.sh
-data.json
-config.json
+
+#node
+node_modules/
 package-lock.json
 package.json
+
+#storage files
+data.json
 blocked_users.json
+deleted_messages.json
+edited_messages.json
+
+#config file containing secret bot token
+config.json
+
+#ide
 *.iml
 .idea/
