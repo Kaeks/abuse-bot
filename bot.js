@@ -1,13 +1,25 @@
 //// SETUP
 // IMPORTS
-const fs = require('fs');
 const Discord = require('discord.js');
 const CronJob = require('cron').CronJob;
 const { prefix, token } = require('./config.json');
 const client = new Discord.Client();
 require('datejs');
 
+/// EXPORTS
+module.exports = {
+	client
+};
+
 const common = require('./common.js');
+const {
+	fs,
+	Storage, Blocked, Deleted, Edited,
+	loadFile, saveFile,
+	saveData, saveBlocked, saveDeleted, saveEdited,
+	waterTimers, runningTimers,
+	sendDM, sendWednesday
+} = common;
 
 client.commands = new Discord.Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.match(/.js$/));
@@ -15,75 +27,6 @@ for (const file of commandFiles) {
 	const command = require('./commands/' + file);
 	client.commands.set(command.name, command);
 }
-
-//
-let waterTimers = {};
-let runningTimers = {};
-
-let Storage = {};
-try {
-	Storage = require('./data.json');
-	common.debug('Read data.json');
-} catch (e) {
-	fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
-}
-
-let Blocked = [];
-try {
-	Blocked = require('./blocked_users.json');
-	common.debug('Read blocked_users.json');
-} catch (e) {
-	fs.writeFileSync('./blocked_users.json', JSON.stringify(Blocked, null, 2));
-	common.info('Created blocked_users.json');
-}
-
-let Deleted = [];
-try {
-	Deleted = require('./deleted_messages.json');
-	common.debug('Read deleted_messages.json');
-} catch (e) {
-	fs.writeFileSync('./deleted_messages.json', JSON.stringify(Deleted, null, 2));
-	common.info('Created deleted_messages.json');
-}
-
-let Edited = [];
-try {
-	Edited = require('./edited_messages.json');
-	common.debug('Read edited_messages.json');
-} catch (e) {
-	fs.writeFileSync('./edited_messages.json', JSON.stringify(Edited, null, 2));
-	common.info('Created edited_messages.json');
-}
-
-Storage.servers = Storage.servers || {};
-Storage.users = Storage.users || {};
-Storage.reminders = Storage.reminders || [];
-
-fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
-fs.writeFileSync('./blocked_users.json', JSON.stringify(Blocked, null, 2));
-fs.writeFileSync('./deleted_messages.json', JSON.stringify(Deleted, null, 2));
-fs.writeFileSync('./edited_messages.json', JSON.stringify(Edited, null, 2));
-
-let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
-	for (let serverId in Storage.servers) {
-		if (!Storage.servers.hasOwnProperty(serverId)) continue;
-		let cur = Storage.servers[serverId];
-		if (!cur.channels.hasOwnProperty('wednesday')) continue;
-		if (cur.disabledFeatures.wednesday !== true) {
-			let channel = cur.channels.wednesday;
-			sendWednesday(channel);
-		}
-	}
-	for (let userId in Storage.users) {
-		if (!Storage.users.hasOwnProperty(userId)) continue;
-		let cur = Storage.users[userId];
-		if (cur.hasOwnProperty('wednesday')) continue;
-		if (cur.wednesday === true) {
-			let channel = await client.users.get(userId).createDM();
-			sendWednesday(channel.id);
-		}
-	}
-}, null, true, 'Europe/Berlin');
 
 //// EVENTS
 // START
@@ -99,14 +42,14 @@ client.on('ready', () => {
 		setUpServer(guild[1]);
 	}
 
-	loadWaterTimers();
+	//loadWaterTimers();
 	common.debug(waterTimers);
 	common.debug(runningTimers);
-	startAllWaterTimers();
+	//startAllWaterTimers();
 	common.debug(runningTimers);
 
 	common.debug(Storage);
-	fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
+	saveData();
 
 });
 
@@ -115,7 +58,7 @@ client.on('message', msg => {
 	if (checkMessageForCommand(msg)) {
 		if (msg.channel.type !== 'dm' && msg.channel.type !== 'group') {
 			setTimeout(function() {
-				msg.delete().then(common.debug, console.error);
+				msg.delete().catch(console.error);
 			}, 3000);
 		}
 	} else {
@@ -152,7 +95,7 @@ client.on('message', msg => {
 // MESSAGE DELETED
 client.on('messageDelete', message => {
 	if (message.author.bot) {
-		// discard
+		// discard messages created by bots
 		return false;
 	}
 	console.log('Message by ' + message.author + ' deleted.');
@@ -175,7 +118,7 @@ client.on('messageDelete', message => {
 	}
 	if (message.attachments.size > 0) {
 		let shortenedAttachments = [];
-		message.attachments.forEach(function(value, key, map) {
+		message.attachments.forEach(function(value) {
 			shortenedAttachments.push(
 				{
 					id: value.id,
@@ -187,14 +130,14 @@ client.on('messageDelete', message => {
 		});
 		shortened.attachments = shortenedAttachments;
 	}
-	Deleted.push(shortened);
-	fs.writeFileSync('./deleted_messages.json', JSON.stringify(Deleted, null, 2));
+	common.Deleted.push(shortened);
+	common.saveDeleted();
 });
 
 // MESSAGE UPDATED
 client.on('messageUpdate', (oldMessage, newMessage) => {
 	if (oldMessage.author.bot) {
-		// discard
+		// discard messages created by bots
 		return false;
 	}
 	console.log('Message by ' + oldMessage.author + ' edited.');
@@ -214,7 +157,7 @@ client.on('messageUpdate', (oldMessage, newMessage) => {
 		}
 	};
 	Edited.push(combinedEntry);
-	fs.writeFileSync('./edited_messages.json', JSON.stringify(Edited, null, 2));
+	saveEdited();
 });
 
 // ADDED TO SERVER
@@ -228,84 +171,32 @@ client.on('guildDelete', guild => {
 	console.log('Whoa whoa whoa I just got kicked from ' + guild.name);
 });
 
-//// METHODS
-
-function getTimeZone(user) {
-	return Storage.users[user.id].timeZone;
-}
-
-function loadWaterTimers() {
-	for (let user in Storage.users) {
-		if (!Storage.users.hasOwnProperty(user)) continue;
-		if (!Storage.users[user].hasOwnProperty('water')) continue;
-		if (Storage.users[user].water.enabled === true) {
-			addWaterTimer(user, Storage.users[user].water.interval);
+//// CRON
+// WEDNESDAY
+let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
+	for (let serverId in Storage.servers) {
+		if (!Storage.servers.hasOwnProperty(serverId)) continue;
+		let cur = Storage.servers[serverId];
+		if (!cur.channels.hasOwnProperty('wednesday')) continue;
+		if (cur.disabledFeatures.wednesday !== true) {
+			let channel = cur.channels.wednesday;
+			sendWednesday(channel);
 		}
 	}
-}
-
-function addWaterTimer(user, interval) {
-	waterTimers[user] = interval;
-}
-
-function startAllWaterTimers() {
-	for (let userId in waterTimers) {
-		if (!waterTimers.hasOwnProperty(userId)) continue;
-		startWaterTimer(userId);
+	for (let userId in Storage.users) {
+		if (!Storage.users.hasOwnProperty(userId)) continue;
+		let cur = Storage.users[userId];
+		if (cur.hasOwnProperty('wednesday')) continue;
+		if (cur.wednesday === true) {
+			let channel = await client.users.get(userId).createDM();
+			sendWednesday(channel.id);
+		}
 	}
-}
+}, null, true, 'Europe/Berlin');
 
-function startWaterTimer(userId) {
-	let now = (new Date()).getTime();
-	common.debug('[startWaterTimer]: ' + waterTimers[userId]);
-	common.debug(waterTimers);
-	let curTimer = setInterval(function() {
-		sendWater(userId);
-	}, waterTimers[userId] * 60000);
-	if (runningTimers[userId] == null) {
-		runningTimers[userId] = {};
-	}
-	runningTimers[userId].timer = curTimer;
-	runningTimers[userId].started = now;
-}
-
-function stopWaterTimer(userId) {
-	if (runningTimers[userId] == null) {
-		return false;
-	}
-	clearInterval(runningTimers[userId].timer);
-	runningTimers[userId] = null;
-}
-
-function updateWaterTimer(userId) {
-	stopWaterTimer(userId);
-	waterTimers[userId] = Storage.users[userId].water.interval;
-	startWaterTimer(userId);
-}
-
-function getWaterTimerStatus(userId) {
-	let now = (new Date()).getTime();
-	return (runningTimers[userId].started + waterTimers[userId] * 1000) - now;
-}
-
-async function sendDM(userId, message) {
-	let cur = client.users.get(userId);
-	let channel = await cur.createDM();
-	channel.send(message)
-		.then(common.debug, console.error);
-}
-
-function sendWater(userId) {
-	let user = client.users.get(userId);
-	runningTimers[userId].started = (new Date()).getTime();
-	if (user.presence.status === 'offline' || user.presence.status === 'dnd') {
-		return false;
-	}
-	let embed = new Discord.RichEmbed()
-		.setTitle('Stay hydrated!')
-		.setDescription('Drink some water **now**.')
-		.setThumbnail('https://media.istockphoto.com/photos/splash-fresh-drop-in-water-close-up-picture-id801948192');
-	return sendDM(userId, {embed});
+//// METHODS
+function getTimeZone(user) {
+	return Storage.users[user.id].timeZone;
 }
 
 function setUpServer(server) {
@@ -315,7 +206,7 @@ function setUpServer(server) {
 	}
 	Storage.servers[server.id].channels = Storage.servers[server.id].channels || {};
 	Storage.servers[server.id].disabledFeatures = Storage.servers[server.id].disabledFeatures || {};
-	fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
+	saveData();
 }
 
 function setUpUser(user) {
@@ -326,30 +217,26 @@ function setUpUser(user) {
 	Storage.users[user.id].wednesday = Storage.users[user.id].wednesday || {};
 	Storage.users[user.id].water = Storage.users[user.id].water || {};
 	Storage.users[user.id].timeZone = Storage.users[user.id].timeZone || '+0100';
-	fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
-}
-
-function sendWednesday(channelID) {
-	let embed = new Discord.RichEmbed()
-		.setTitle('It is Wednesday, my dudes.')
-		.setColor(0x00AE86)
-		.setImage('https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg');
-	client.channels.get(channelID).send({embed});
+	saveData();
 }
 
 function updatePresence(status = 'online', name = prefix + 'help', type = 'LISTENING', url = 'https://www.github.com/Kaeks/wiktor-bot') {
 	client.user.setStatus(status)
-		.then(common.debug, console.error);
+		.catch(console.error);
 	client.user.setPresence({
 		game : {
 			name : name,
 			type : type,
 			url: url
 		}
-	}).then(common.debug, console.error);
+	}).catch(console.error);
 }
 
-function findSubCommand(msg, suffix, command) {
+function findSubCommand(msg, suffix, command, commandChain = []) {
+	let localCommandChain = commandChain.slice();
+	localCommandChain.push(command);
+	let commandString = common.combineCommandChain(localCommandChain);
+	console.log(commandString);
 
 	let canExecute = false;
 
@@ -361,33 +248,46 @@ function findSubCommand(msg, suffix, command) {
 	common.debug('FIRST ARG: ' + firstArg);
 
 	if (firstArg === '') {
+		// firstarg is empty and thus there is no suffix
 		if (command.args !== common.argumentValues.REQUIRED) canExecute = true;
-	}
+	} else {
+		// firstarg is not empty and thus there is a suffix
+		let newSuffix = suffix.substring(firstArg.length + 1);
+		common.debug('NEW SUFFIX: ' + newSuffix);
 
-	let newSuffix = suffix.substring(firstArg.length + 1);
-	common.debug('NEW SUFFIX: ' + newSuffix);
+		// subIndex is the index where the subcommand lies within the list of commands
+		let subIndex = -1;
 
-	let subIndex = -1;
-
-	if (command.hasOwnProperty('sub')) {
-		for (let i = 0; i < command.sub.length; i++) {
-			if (command.sub[i].name === firstArg.toLowerCase()) {
-				subIndex = i;
-				break;
+		if (command.hasOwnProperty('sub')) {
+			for (let i = 0; i < command.sub.length; i++) {
+				if (command.sub[i].name === firstArg.toLowerCase()) {
+					subIndex = i;
+					break;
+				}
 			}
+		}
+
+		// if there is a subcommand, go through to it
+		if (subIndex >= 0) {
+			return findSubCommand(msg, newSuffix, command.sub[subIndex], localCommandChain);
+		} else if (command.args === common.argumentValues.REQUIRED || command.args === common.argumentValues.OPTIONAL) {
+			// if there is no subcommand and args are required / optional (suffix has a value!)
+			canExecute = true;
 		}
 	}
 
-	if (subIndex >= 0) findSubCommand(msg, newSuffix, command.sub[subIndex]);
-	else if (command.args === common.argumentValues.REQUIRED || command.args === common.argumentValues.OPTIONAL) canExecute = true;
-
 	if (canExecute) {
-		console.log('executing with this suffix: ' + suffix);
+		common.debug('executing with this suffix: ' + suffix);
 		command.execute(msg, suffix);
 		return true;
 	} else {
 		// display help
-		console.log(common.getCommandHelp(command));
+		console.log('CAN\'T EXECUTE!');
+		let embed = new Discord.RichEmbed()
+			.setColor('00AE86')
+			.setTitle('Help for ' + commandString)
+			.setDescription(common.getCommandHelp(command, commandChain));
+		msg.channel.send({embed});
 	}
 	return false;
 }
@@ -400,7 +300,7 @@ function checkMessageForCommand(msg) {
 
 	// Filter out blocked users
 	if (Blocked.includes(msg.author.id)) {
-		console.log('User is on blocked user list');
+		common.debug('User is on blocked user list');
 		msg.channel.send('I\'m sorry, ' + msg.author + ', you\'ve been blocked from using me.');
 		return false;
 	}
@@ -420,11 +320,11 @@ function checkMessageForCommand(msg) {
 		findSubCommand(msg, suffix, command);
 		return true;
 	} catch (e) {
-		console.log(e.stack);
-		msg.channel.send('Internal Error. Command `' + commandName + '` failed.').then(common.debug, console.error);
+		console.error(e.stack);
+		msg.channel.send('Internal Error. Command `' + commandName + '` failed.').catch(console.error);
 	}
 	return false;
 }
 
 client.login(token)
-	.then(common.debug, console.error);
+	.catch(console.error);

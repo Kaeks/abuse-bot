@@ -16,7 +16,7 @@ Written using [discord.js](https://discord.js.org). I will try to keep this bot 
 {
     "prefix": <BOT COMMAND PREFIX>,
     "token": <TOKEN>,
-    "debug": <true|false>
+    "debugMode": <true|false>
 }
 ```
 

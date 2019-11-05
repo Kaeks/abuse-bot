@@ -13,21 +13,23 @@ module.exports = {
 		'Show help for all commands.',
 		'Show help for <command>'
 	],
-	execute(msg, args) {
+	execute(msg, suffix) {
 		const { commands } = msg.client;
 
 		let embed = new Discord.RichEmbed().setColor(0x00AE86);
 
-		if (!args.length) {
-			console.log(commands);
+		if (suffix.length === 0) {
+			embed.setTitle('Help for all commands');
+			common.getFullHelpEmbed(msg, embed);
+			common.sendDM(msg.author.id,{embed});
 		} else {
-			const commandName = args.split(' ')[0].toLowerCase();
+			const commandName = suffix.split(' ')[0].toLowerCase();
 			common.debug('commandName: ' + commandName);
 			if (!commands.has(commandName)) return false;
 			const command = commands.get(commandName);
-			embed = embed.setTitle('Help for ' + prefix + commandName)
+			embed.setTitle('Help for ' + prefix + commandName)
 				.setDescription(common.getCommandHelp(command));
+			msg.channel.send({embed});
 		}
-		msg.channel.send({embed});
 	}
 };
