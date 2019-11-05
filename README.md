@@ -1,6 +1,6 @@
-#abuse-bot
+# abuse-bot
 
-##Setup
+## Setup
 
 Requires node.js
 
@@ -22,7 +22,7 @@ Written using [discord.js](https://discord.js.org). I will try to keep this bot 
 
 3. Run bot.js through `node bot.js`.
 
-##Privacy Disclaimer
+## Privacy Disclaimer
 
 This bot stores data that is available to it through discord.js and, by extension, the Discord API and uses it to perform its functions. This data includes but is not limited to: Usernames (including # handle), nicknames, avatars, chat messages sent in channels to which the bot has access to and the bot's own DMs, as well as any attached files in these messages.
 
