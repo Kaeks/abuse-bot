@@ -1,5 +1,4 @@
 ##local files
-start.sh
 
 #node
 node_modules/
@@ -15,6 +14,9 @@ dumps/
 
 #config file containing secret bot token
 config.json
+
+#development exclusive command
+commands/dev.js
 
 #ide
 *.iml

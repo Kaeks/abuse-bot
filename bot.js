@@ -55,6 +55,7 @@ client.on('ready', () => {
 
 // MESSAGE
 client.on('message', msg => {
+	if (msg.author.id === client.user.id) return false;
 	if (checkMessageForCommand(msg)) {
 		if (msg.channel.type !== 'dm' && msg.channel.type !== 'group') {
 			setTimeout(function() {
@@ -277,7 +278,6 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 
 function checkMessageForCommand(msg) {
 	// Check whether the message was issued by another user
-	if (msg.author.id === client.user.id) return false;
 	if (!msg.content.startsWith(Config.prefix)) return false;
 	if (!Storage.users.hasOwnProperty(msg.author.id)) setUpUser(msg.author);
 

@@ -15,13 +15,19 @@ module.exports = {
 	sub : [
 		{
 			name : 'clean',
-			args : common.argumentValues.OPTIONAL,
-			usage: [ '[amount]' ],
+			args : common.argumentValues.NONE,
+			usage: [ '' ],
 			description : [ 'I clean up after myself.' ],
-			execute(msg, suffix) {
+			async execute(msg) {
 				let channel = msg.channel;
-				let amt = suffix == null ? 10 : suffix;
-				channel.bulkDelete(amt, true);
+				let client = msg.client;
+				let messagesByBot = await getMessages(msg.client, channel, function(element) {
+					return element.author.id === client.user.id;
+				});
+				console.info('Deleting ' + messagesByBot.size + ' of my messages.');
+				messagesByBot.forEach(function(value) {
+					value.delete().catch(console.error);
+				});
 			}
 		},
 		{
@@ -35,8 +41,9 @@ module.exports = {
 					description : [ 'Dumps all direct messages with a user. This user if ID is not specified.' ],
 					async execute(msg, suffix) {
 						let client = msg.client;
-						let channel = suffix == null ? msg.channel : client.channels.get(suffix);
-						let dump = await createDump(client, 'dm', channel);
+						let user = suffix == null ? msg.author : client.users.get(suffix);
+						let channel = user.dmChannel;
+						let dump = await createDump(client, DUMP_TYPE.DM, channel);
 						writeDump(dump);
 						//console.log(dump.length + ' messages');
 					}
@@ -45,7 +52,13 @@ module.exports = {
 					name : 'channel',
 					args : common.argumentValues.OPTIONAL,
 					usage : [ '[id]' ],
-					description : [ 'Dumps all messages in a channel. This channel if ID is not specified.' ]
+					description : [ 'Dumps all messages in a channel. This channel if ID is not specified.' ],
+					async execute(msg, suffix) {
+						let client = msg.client;
+						let channel = suffix == null ? msg.channel : client.channels.get(suffix);
+						let dump = await createDump(client, DUMP_TYPE.CHANNEL, channel);
+						writeDump(dump);
+					}
 				},
 				{
 					name : 'server',
@@ -74,26 +87,54 @@ async function createDump(client, type, channel) {
 	return item;
 }
 
-async function getShortenedMessages(client, channel, start, list = []) {
+//TODO: add counter for amount of messages, track time taken until finish etc.
+
+async function getMessages(client, channel, filter, start, collection = new Discord.Collection()) {
 	console.log('Getting messages...');
 	let options = {
 		limit : 100
 	};
 	if (start) options.before = start;
 	let request = await channel.fetchMessages(options);
+	if (filter) request = request.filter(filter);
 	console.log('Request size: ' + request.size);
-	if (request.size === 0) return list;
+	let newCollection = collection.concat(request);
+	if (request.size === 0) return newCollection;
+	return getMessages(client, channel, filter, request.last().id, newCollection);
+}
 
-	request.forEach(function(value) {
-		list.push(
-			{
-				author : value.author.username + '#' + value.author.discriminator,
-				content : value.content
-			}
-		);
+async function getShortenedMessages(client, channel, filter) {
+	let request = await getMessages(client, channel, filter)
+
+	let list = [];
+
+	request.forEach(message => {
+
+		let shortened = {
+			author : message.author.username + '#' + message.author.discriminator,
+			content : message.content,
+			attachments : []
+		}
+
+		if (message.attachments.size > 0) {
+			let shortenedAttachments = [];
+			message.attachments.forEach(value => {
+				shortenedAttachments.push(
+					{
+						id: value.id,
+						filename: value.filename,
+						url: value.url,
+						proxyURL: value.proxyURL
+					}
+				);
+			});
+			shortened.attachments = shortenedAttachments;
+		}
+
+		list.push(shortened);
 	});
 
-	return getShortenedMessages(client, channel, request.last().id, list);
+	return list;
 }
 
 function generateDumpName(dump) {
