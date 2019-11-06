@@ -1,11 +1,12 @@
 const common = require('../common.js');
+const Discord = require('discord.js');
 
 module.exports = {
 	name : 'f',
 	args : common.argumentValues.NONE,
-	usage : '',
-	description : 'Pay respects.',
-	execute(msg, suffix) {
+	usage : [ '' ],
+	description : [ 'Pay respects.' ],
+	execute(msg) {
 		let embed = new Discord.RichEmbed()
 			.setColor(0x00AE86)
 			.setAuthor(msg.author.username, msg.author.displayAvatarURL)

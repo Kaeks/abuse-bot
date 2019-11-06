@@ -1,9 +1,10 @@
 const fs = require('fs');
+const path = require('path');
 const Discord = require('discord.js');
-const { debugMode, prefix } = require('./config.json');
 const { client } = require('./bot.js');
 
 // CONSTANTS
+const CONFIG_PATH = './config.json';
 const DATA_PATH = './data.json';
 const BLOCKED_PATH = './blocked_users.json';
 const DELETED_PATH = './deleted_messages.json';
@@ -14,20 +15,29 @@ let waterTimers = {};
 let runningTimers = {};
 
 // DATA VARS
+let Config = {};
 let Storage = {};
 let Blocked = [];
 let Deleted = [];
 let Edited = [];
 
+// LOAD FILES
+Config = loadFile(CONFIG_PATH, Config);
 Storage = loadFile(DATA_PATH, Storage);
 Blocked = loadFile(BLOCKED_PATH, Blocked);
 Deleted = loadFile(DELETED_PATH, Deleted);
 Edited = loadFile(EDITED_PATH, Edited);
 
+// SET DEFAULT VALUES
+Config.prefix = Config.prefix || '!';
+Config.token = Config.token || '';
+Config.debug = Config.debug !== undefined ? Config.debug : false;
+
 Storage.servers = Storage.servers || {};
 Storage.users = Storage.users || {};
 Storage.reminders = Storage.reminders || [];
 
+saveFile(CONFIG_PATH, Config);
 saveFile(DATA_PATH, Storage);
 saveFile(BLOCKED_PATH, Blocked);
 saveFile(DELETED_PATH, Deleted);
@@ -42,21 +52,20 @@ let argumentValues = {
 
 //// EXPORTS
 module.exports = {
-	fs,
-	Storage, Blocked, Deleted, Edited,
+	fs, client,
+	Config, Storage, Blocked, Deleted, Edited,
 	loadFile, saveFile,
-	saveData, saveBlocked, saveDeleted, saveEdited,
+	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited,
 	argumentValues,
-	info,
-	warn,
-	debug,
+	info, warn, debug,
 	sendDM,
-	sendWednesday,
+	updatePresence,
 	unparseDate,
+	sendWednesday,
 	combineCommandChain,
-	getHelpRow,
-	getCommandHelp,
-	getFullHelpEmbed
+	getHelpRow, getCommandHelp, getFullHelpEmbed,
+	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
+	mkDirByPathSync
 };
 
 //// METHODS
@@ -70,7 +79,7 @@ function warn(msg) {
 }
 
 function debug(msg) {
-	if (debugMode) {
+	if (Config.debug) {
 		if (msg instanceof Object) {
 			console.log('\x1b[36m%s\x1b[0m', '[DEBUG]');
 			console.log(msg);
@@ -98,6 +107,7 @@ function saveFile(path, variable) {
 }
 
 // SPECIFIC SAVES
+function saveConfig()	{saveFile(CONFIG_PATH,	Config);	}
 function saveData() 	{saveFile(DATA_PATH, 	Storage);	}
 function saveBlocked()	{saveFile(BLOCKED_PATH, Blocked);	}
 function saveDeleted() 	{saveFile(DELETED_PATH, Deleted);	}
@@ -116,6 +126,18 @@ async function sendDM(userId, message) {
 	let cur = client.users.get(userId);
 	let channel = await cur.createDM();
 	return channel.send(message);
+}
+
+function updatePresence(status = 'online', name = Config.prefix + 'help', type = 'LISTENING', url = 'https://www.github.com/Kaeks/wiktor-bot') {
+	client.user.setStatus(status)
+		.catch(console.error);
+	client.user.setPresence({
+		game : {
+			name : name,
+			type : type,
+			url: url
+		}
+	}).catch(console.error);
 }
 
 function unparseDate(date) {
@@ -150,7 +172,7 @@ function combineCommandChain(commandChain) {
  * @returns {string}
  */
 function getHelpRow(commandString, usage, description) {
-	let base = '`' + prefix + commandString + ' ' + usage + '`' + '\n';
+	let base = '`' + Config.prefix + commandString + ' ' + usage + '`' + '\n';
 	return description === undefined ? base : base + '-- ' + description + '\n';
 }
 
@@ -227,6 +249,23 @@ function sendWednesday(channelId) {
 }
 
 // WATER
+function sendWater(userId) {
+	let user = client.users.get(userId);
+	runningTimers[userId].started = (new Date()).getTime();
+	if (user.presence.status === 'offline' || user.presence.status === 'dnd') {
+		return false;
+	}
+	let embed = new Discord.RichEmbed()
+		.setTitle('Stay hydrated!')
+		.setDescription('Drink some water **now**.')
+		.setThumbnail('https://media.istockphoto.com/photos/splash-fresh-drop-in-water-close-up-picture-id801948192');
+	return sendDM(userId, {embed});
+}
+
+function addWaterTimer(user, interval) {
+	waterTimers[user] = interval;
+}
+
 function loadWaterTimers() {
 	for (let user in Storage.users) {
 		if (!Storage.users.hasOwnProperty(user)) continue;
@@ -234,17 +273,6 @@ function loadWaterTimers() {
 		if (Storage.users[user].water.enabled === true) {
 			addWaterTimer(user, Storage.users[user].water.interval);
 		}
-	}
-}
-
-function addWaterTimer(user, interval) {
-	waterTimers[user] = interval;
-}
-
-function startAllWaterTimers() {
-	for (let userId in waterTimers) {
-		if (!waterTimers.hasOwnProperty(userId)) continue;
-		startWaterTimer(userId);
 	}
 }
 
@@ -260,6 +288,13 @@ function startWaterTimer(userId) {
 	}
 	runningTimers[userId].timer = curTimer;
 	runningTimers[userId].started = now;
+}
+
+function startAllWaterTimers() {
+	for (let userId in waterTimers) {
+		if (!waterTimers.hasOwnProperty(userId)) continue;
+		startWaterTimer(userId);
+	}
 }
 
 function stopWaterTimer(userId) {
@@ -281,15 +316,32 @@ function getWaterTimerStatus(userId) {
 	return (runningTimers[userId].started + waterTimers[userId] * 1000) - now;
 }
 
-function sendWater(userId) {
-	let user = client.users.get(userId);
-	runningTimers[userId].started = (new Date()).getTime();
-	if (user.presence.status === 'offline' || user.presence.status === 'dnd') {
-		return false;
-	}
-	let embed = new Discord.RichEmbed()
-		.setTitle('Stay hydrated!')
-		.setDescription('Drink some water **now**.')
-		.setThumbnail('https://media.istockphoto.com/photos/splash-fresh-drop-in-water-close-up-picture-id801948192');
-	return sendDM(userId, {embed});
+// filesystem helper method ripped off SO
+function mkDirByPathSync(targetDir, { isRelativeToScript = false } = {}) {
+	const sep = path.sep;
+	const initDir = path.isAbsolute(targetDir) ? sep : '';
+	const baseDir = isRelativeToScript ? __dirname : '.';
+
+	return targetDir.split(sep).reduce((parentDir, childDir) => {
+		const curDir = path.resolve(baseDir, parentDir, childDir);
+		try {
+			fs.mkdirSync(curDir);
+		} catch (err) {
+			if (err.code === 'EEXIST') { // curDir already exists!
+				return curDir;
+			}
+
+			// To avoid `EISDIR` error on Mac and `EACCES`-->`ENOENT` and `EPERM` on Windows.
+			if (err.code === 'ENOENT') { // Throw the original parentDir error on curDir `ENOENT` failure.
+				throw new Error(`EACCES: permission denied, mkdir '${parentDir}'`);
+			}
+
+			const caughtErr = ['EACCES', 'EPERM', 'EISDIR'].indexOf(err.code) > -1;
+			if (!caughtErr || caughtErr && curDir === path.resolve(targetDir)) {
+				throw err; // Throw if it's just the last created dir.
+			}
+		}
+
+		return curDir;
+	}, initDir);
 }

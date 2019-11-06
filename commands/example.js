@@ -1,6 +1,4 @@
 const common = require('../common.js');
-const Discord = require('discord.js');
-const Storage = require('../data.json');
 
 /*
 	'args' property:
@@ -17,13 +15,19 @@ module.exports = {
 			name : 'a',
 			args : common.argumentValues.NONE,
 			usage : '',
-			description : 'example subcommand without parameter'
+			description : 'Example sub-command that doesn\'t accept parameters.',
+			execute(msg) {
+				msg.reply('This is an example sub-command and doesn\'t accept parameters');
+			}
 		},
 		{
 			name : 'b',
 			args : common.argumentValues.REQUIRED,
 			usage : '<yeet>',
-			description : 'example subcommand with required parameter'
+			description : 'Example sub-command with a required parameter',
+			execute(msg, suffix) {
+				msg.reply('This is an example sub-command that requires a parameter. The passed parameter is: `' + suffix + '`.');
+			}
 		},
 		{
 			name : 'c',
@@ -33,17 +37,25 @@ module.exports = {
 					name : 'ca',
 					args : common.argumentValues.OPTIONAL,
 					usage : '[yah]',
-					description : 'example subcommand of subcommand with optional parameter'
+					description : 'Example sub-command of a sub-command with an optional parameter',
+					execute(msg, suffix) {
+						let addition = suffix.split(' ')[0] === '' ? ' There was no parameter given.' : 'The paramater `' + suffix + '` was given.';
+						msg.reply('This is an example sub-command of a sub-command that accepts a parameter but doesn\'t require one.' + addition);
+					}
 				}
 			],
 			usage : '',
-			description : 'example subcommand with optional subcommand'
+			description : 'Example sub-command with an optional sub-command',
+			execute(msg, suffix) {
+				let addition = suffix.split(' ')[0] === '' ? ' There was no parameter given.' : 'The paramater `' + suffix + '` was given.';
+				msg.reply('This is an example sub-command that accepts a parameter but doesn\'t require one.' + addition);
+			}
 		}
 	],
 	usage : '',
-	description : 'example command with optional subcommands',
-
+	description : 'Example command with optional sub-commands',
 	execute(msg, suffix) {
-		msg.reply('this command does straight up nothing dude lmao');
+		let addition = suffix.split(' ')[0] === '' ? ' There was no parameter given.' : 'The paramater `' + suffix + '` was given.';
+		msg.reply('This is an example command that accept a parameter but doesn\'t require one.' + addition);
 	}
 };

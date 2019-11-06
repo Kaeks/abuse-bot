@@ -2,7 +2,6 @@
 // IMPORTS
 const Discord = require('discord.js');
 const CronJob = require('cron').CronJob;
-const { prefix, token } = require('./config.json');
 const client = new Discord.Client();
 require('datejs');
 
@@ -14,11 +13,12 @@ module.exports = {
 const common = require('./common.js');
 const {
 	fs,
-	Storage, Blocked, Deleted, Edited,
+	Config, Storage, Blocked, Deleted, Edited,
 	loadFile, saveFile,
 	saveData, saveBlocked, saveDeleted, saveEdited,
 	waterTimers, runningTimers,
-	sendDM, sendWednesday
+	sendDM, updatePresence,
+	sendWednesday
 } = common;
 
 client.commands = new Discord.Collection();
@@ -130,8 +130,8 @@ client.on('messageDelete', message => {
 		});
 		shortened.attachments = shortenedAttachments;
 	}
-	common.Deleted.push(shortened);
-	common.saveDeleted();
+	Deleted.push(shortened);
+	saveDeleted();
 });
 
 // MESSAGE UPDATED
@@ -220,42 +220,23 @@ function setUpUser(user) {
 	saveData();
 }
 
-function updatePresence(status = 'online', name = prefix + 'help', type = 'LISTENING', url = 'https://www.github.com/Kaeks/wiktor-bot') {
-	client.user.setStatus(status)
-		.catch(console.error);
-	client.user.setPresence({
-		game : {
-			name : name,
-			type : type,
-			url: url
-		}
-	}).catch(console.error);
-}
-
+//// COMMAND HANDLING
 function findSubCommand(msg, suffix, command, commandChain = []) {
 	let localCommandChain = commandChain.slice();
 	localCommandChain.push(command);
 	let commandString = common.combineCommandChain(localCommandChain);
-	console.log(commandString);
 
 	let canExecute = false;
 
-	common.debug('SUFFIX: ' + suffix);
-	let splitList = suffix.split(' ');
-	common.debug('SPLIT LIST: ');
-	common.debug(splitList);
-	let firstArg = splitList[0];
-	common.debug('FIRST ARG: ' + firstArg);
-
-	if (firstArg === '') {
-		// firstarg is empty and thus there is no suffix
+	if (suffix == null) {
+		// Suffix is empty
 		if (command.args !== common.argumentValues.REQUIRED) canExecute = true;
 	} else {
-		// firstarg is not empty and thus there is a suffix
-		let newSuffix = suffix.substring(firstArg.length + 1);
-		common.debug('NEW SUFFIX: ' + newSuffix);
+		// Suffix is not empty
+		let splitList = suffix.split(/ +/);
+		let firstArg = splitList[0];
 
-		// subIndex is the index where the subcommand lies within the list of commands
+		// subIndex is the index where the sub-command lies within the list of commands
 		let subIndex = -1;
 
 		if (command.hasOwnProperty('sub')) {
@@ -267,22 +248,24 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 			}
 		}
 
-		// if there is a subcommand, go through to it
+		// if there is a sub-command, go through to it
 		if (subIndex >= 0) {
+			let temp = suffix.substring(firstArg.length);
+			let match = temp.match(/ +/);
+
+			let newSuffix = match !== null ? temp.substring(match[0].length) : null;
 			return findSubCommand(msg, newSuffix, command.sub[subIndex], localCommandChain);
 		} else if (command.args === common.argumentValues.REQUIRED || command.args === common.argumentValues.OPTIONAL) {
-			// if there is no subcommand and args are required / optional (suffix has a value!)
+			// if there is no sub-command and args are required / optional
 			canExecute = true;
 		}
 	}
 
 	if (canExecute) {
-		common.debug('executing with this suffix: ' + suffix);
+		common.debug('Executing command \'' + commandString + '\' with suffix: \'' + suffix + '\'');
 		command.execute(msg, suffix);
 		return true;
 	} else {
-		// display help
-		console.log('CAN\'T EXECUTE!');
 		let embed = new Discord.RichEmbed()
 			.setColor('00AE86')
 			.setTitle('Help for ' + commandString)
@@ -295,7 +278,7 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 function checkMessageForCommand(msg) {
 	// Check whether the message was issued by another user
 	if (msg.author.id === client.user.id) return false;
-	if (!msg.content.startsWith(prefix)) return false;
+	if (!msg.content.startsWith(Config.prefix)) return false;
 	if (!Storage.users.hasOwnProperty(msg.author.id)) setUpUser(msg.author);
 
 	// Filter out blocked users
@@ -305,16 +288,18 @@ function checkMessageForCommand(msg) {
 		return false;
 	}
 
-	//	/([^\"\']\S*|\".+?\"|\'.+?\')\s*/g
-
-	const commandName = msg.content.slice(prefix.length).split(' ')[0].toLowerCase();
+	const split = msg.content.slice(Config.prefix.length).split(/ +/);
+	const commandName = split[0].toLowerCase();
 	common.debug('commandName: ' + commandName);
-	const suffix = msg.content.substring(commandName.length + prefix.length + 1);
-	common.debug('suffix: ' + suffix);
 
 	if (!client.commands.has(commandName)) return false;
-
 	const command = client.commands.get(commandName);
+
+	let temp = msg.content.substring(Config.prefix.length + commandName.length);
+	let match = temp.match(/ +/);
+
+	const suffix = match !== null ? temp.substring(match[0].length) : null;
+	common.debug('suffix: ' + suffix);
 
 	try {
 		findSubCommand(msg, suffix, command);
@@ -326,5 +311,6 @@ function checkMessageForCommand(msg) {
 	return false;
 }
 
-client.login(token)
+//// ENTRY POINT
+client.login(Config.token)
 	.catch(console.error);

@@ -1,11 +1,14 @@
 const common = require('../common.js');
 const {
-	fs,
-	Storage,
+	Config, Storage,
 	saveData,
-	waterTimers, runningTimers
+	waterTimers, runningTimers,
+	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus
 } = common;
 const Discord = require('discord.js');
+
+// Default water interval (in minutes) to be set when people join the water club
+const DEFAULT_WATER_INTERVAL = 60;
 
 module.exports = {
 	name : 'water',
@@ -18,8 +21,10 @@ module.exports = {
 			description : 'Display your current water status.',
 			execute(msg) {
 				let user = msg.author;
-				if (!checkWaterMember(user)) msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
-
+				if (!checkWaterMember(user)) {
+					msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+					return false;
+				}
 				let seconds = Math.floor(getWaterTimerStatus(user.id) / 1000);
 				let minutes = Math.floor(seconds / 60);
 				let newSeconds = seconds - minutes * 60;
@@ -34,22 +39,20 @@ module.exports = {
 			description : 'Join the water club.',
 			execute(msg) {
 				let user = msg.author;
-				const WATER_INTERVAL = 60;
-				Storage.users[user.id] = Storage.users[user.id] || {};
-				Storage.users[user.id].water = Storage.users[user.id].water || {};
-				common.debug(Storage.users);
-				if (Storage.users[user.id].water.enabled === true) {
+				let storageUser = Storage.users[user.id];
+				storageUser = storageUser || {};
+				storageUser.water = storageUser.water || {};
+				common.debug(storageUser);
+				if (checkWaterMember(user)) {
 					msg.channel.send('You are already a member of the water club!');
 					return;
 				}
-				common.debug(Storage.users);
-				Storage.users[user.id].water.enabled = true;
-				Storage.users[user.id].water.interval = WATER_INTERVAL;
-				common.debug(Storage.users);
-				fs.writeFileSync('./data.json', JSON.stringify(Storage, null, 2));
-				common.debug(Storage.users);
-				msg.channel.send('Welcome to the water club, ' + msg.author + '!\nYou will be notified every ' + WATER_INTERVAL + ' minutes (default value).');
-				addWaterTimer(user.id, Storage.users[user.id].water.interval);
+				storageUser.water.enabled = true;
+				storageUser.water.interval = storageUser.water.interval || DEFAULT_WATER_INTERVAL;
+				saveData();
+				common.debug(storageUser);
+				msg.channel.send('Welcome to the water club, ' + msg.author + '!\nYou will be notified every ' + DEFAULT_WATER_INTERVAL + ' minutes (default value).');
+				addWaterTimer(user.id, storageUser.water.interval);
 			}
 		},
 		{
@@ -60,8 +63,8 @@ module.exports = {
 			execute(msg) {
 				let user = msg.author;
 				if (!checkWaterMember(user)) {
-					msg.channel.send('Can\'t leave a club you are not a member of :^)');
-					return;
+					msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+					return false;
 				}
 				Storage.users[user.id].water.enabled = false;
 				saveData();
@@ -76,34 +79,31 @@ module.exports = {
 				{
 					name : 'set',
 					args : common.argumentValues.REQUIRED,
-					usage : '<minutes>',
-					description : 'Set a new interval',
+					usage : '<interval>',
+					description : 'Set a new interval (in minutes)',
 					execute(msg, suffix) {
 						let user = msg.author;
-						if (!checkWaterMember(user)) msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
-
-						let args = suffix.split(' ');
-						if (args[0] != null) {
-							let newIntervalString = args[0];
-							if (!isNaN(newIntervalString)) {
-								if (parseInt(newIntervalString, 10) > 0 ) {
-									let newInterval = parseInt(newIntervalString, 10);
-									Storage.users[user.id].water.interval = newInterval;
-									saveData();
-									msg.channel.send('Water interval has been set to ' + newInterval + ' minutes.');
-									common.debug(waterTimers);
-									common.debug(runningTimers);
-									updateWaterTimer(user.id);
-									common.debug(waterTimers);
-									common.debug(runningTimers);
-								} else {
-									msg.channel.send('<interval> must be above 0.');
-								}
+						if (!checkWaterMember(user)) {
+							msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+							return false;
+						}
+						let newIntervalString = suffix;
+						if (!isNaN(newIntervalString)) {
+							if (parseInt(newIntervalString, 10) > 0 ) {
+								let newInterval = parseInt(newIntervalString, 10);
+								Storage.users[user.id].water.interval = newInterval;
+								saveData();
+								msg.channel.send('Water interval has been set to ' + newInterval + ' minutes.');
+								common.debug(waterTimers);
+								common.debug(runningTimers);
+								updateWaterTimer(user.id);
+								common.debug(waterTimers);
+								common.debug(runningTimers);
 							} else {
-								msg.channel.send('<interval> must be an integer.');
+								msg.channel.send('<interval> must be above 0.');
 							}
 						} else {
-							msg.channel.send('Usage: `' + Storage.prefix + 'water set <interval in minutes>`');
+							msg.channel.send('<interval> must be an integer.');
 						}
 					}
 				}
@@ -112,8 +112,10 @@ module.exports = {
 			description : 'Display your current interval',
 			execute(msg) {
 				let user = msg.author;
-				if (!checkWaterMember(user)) msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
-
+				if (!checkWaterMember(user)) {
+					msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+					return false;
+				}
 				let userInterval = Storage.users[user.id].water.interval;
 				msg.channel.send('Your interval is set to ' + userInterval + ' minutes.');
 			}

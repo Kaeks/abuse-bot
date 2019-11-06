@@ -1,6 +1,6 @@
 const common = require('../common.js');
+const { Config } = common;
 const Discord = require('discord.js');
-const { prefix } = require('../config.json');
 
 module.exports = {
 	name : 'help',
@@ -18,7 +18,7 @@ module.exports = {
 
 		let embed = new Discord.RichEmbed().setColor(0x00AE86);
 
-		if (suffix.length === 0) {
+		if (suffix == null) {
 			embed.setTitle('Help for all commands');
 			common.getFullHelpEmbed(msg, embed);
 			common.sendDM(msg.author.id,{embed});
@@ -27,7 +27,7 @@ module.exports = {
 			common.debug('commandName: ' + commandName);
 			if (!commands.has(commandName)) return false;
 			const command = commands.get(commandName);
-			embed.setTitle('Help for ' + prefix + commandName)
+			embed.setTitle('Help for ' + Config.prefix + commandName)
 				.setDescription(common.getCommandHelp(command));
 			msg.channel.send({embed});
 		}
