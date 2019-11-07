@@ -11,7 +11,7 @@ const DUMP_TYPE = {
 
 module.exports = {
 	name : 'admin',
-	args : common.argumentValues.REQUIRED,
+	args : common.argumentValues.NULL,
 	sub : [
 		{
 			name : 'clean',
@@ -32,7 +32,7 @@ module.exports = {
 		},
 		{
 			name : 'dump',
-			args : common.argumentValues.REQUIRED,
+			args : common.argumentValues.NULL,
 			sub : [
 				{
 					name : 'dm',
@@ -42,10 +42,9 @@ module.exports = {
 					async execute(msg, suffix) {
 						let client = msg.client;
 						let user = suffix == null ? msg.author : client.users.get(suffix);
-						let channel = user.dmChannel;
-						let dump = await createDump(client, DUMP_TYPE.DM, channel);
+						let channel = await common.getDmChannel(user);
+						let dump = await createDump(msg, client, DUMP_TYPE.DM, channel);
 						writeDump(dump);
-						//console.log(dump.length + ' messages');
 					}
 				},
 				{
@@ -56,7 +55,7 @@ module.exports = {
 					async execute(msg, suffix) {
 						let client = msg.client;
 						let channel = suffix == null ? msg.channel : client.channels.get(suffix);
-						let dump = await createDump(client, DUMP_TYPE.CHANNEL, channel);
+						let dump = await createDump(msg, client, DUMP_TYPE.CHANNEL, channel);
 						writeDump(dump);
 					}
 				},
@@ -77,34 +76,72 @@ module.exports = {
 	],
 };
 
-async function createDump(client, type, channel) {
+async function createDump(msg, client, type, channel) {
+	if (Object.values(DUMP_TYPE).indexOf(type) === -1) throw `Invalid type ${type}.`;
 	if (!['dm', 'group', 'text'].includes(channel.type)) throw 'Channel is not a text based channel.';
-	let content = await getShortenedMessages(client, channel);
-	let item = {
-		type : type,
-		content: content
+
+	// get channel name
+	let str = 'Creating dump for ';
+	str +=
+		type === DUMP_TYPE.DM ? 'DM channel with ' + channel.recipient.username + '#' + channel.recipient.discriminator + ' (' + channel.recipient.id + ')' :
+			type === DUMP_TYPE.CHANNEL ? 'channel \'' + channel.name + '\' (' + channel.id + ')' :
+				type === DUMP_TYPE.SERVER ? 'server \'' + channel.guild.name + '\' (' + channel.guild.id + ')' :
+					type === DUMP_TYPE.ALL ? 'EVERYTHING' : 'nothing';
+	common.info(str);
+
+	let before = new Date();
+	let messages = await getShortenedMessages(client, channel);
+	let after = new Date();
+	let timeDiff = after - before;
+	logTimeTaken(timeDiff);
+	common.log((messages.length / (timeDiff / 1000)).toFixed(2) + ' messages per second.');
+
+	let content = {
+		issued : {
+			on : before,
+			in : {
+				id : msg.channel.id,
+				type : msg.channel.type
+			},
+			by : {
+				handle : msg.author.username + '#' + msg.author.discriminator,
+				id : msg.author.id
+			}
+		},
+		messages : messages
 	};
-	return item;
+	return {
+		type : type,
+		content : content
+	};
 }
 
-//TODO: add counter for amount of messages, track time taken until finish etc.
-
 async function getMessages(client, channel, filter, start, collection = new Discord.Collection()) {
-	console.log('Getting messages...');
+	common.debug('Getting messages...');
 	let options = {
 		limit : 100
 	};
 	if (start) options.before = start;
 	let request = await channel.fetchMessages(options);
 	if (filter) request = request.filter(filter);
-	console.log('Request size: ' + request.size);
 	let newCollection = collection.concat(request);
-	if (request.size === 0) return newCollection;
+
+	let str = 'Request size:';
+	for (let i = 0; i < 4 - request.size.toString().length; i++) {
+		str += ' ';
+	}
+	str +=  request.size + ' Current size: ' + newCollection.size;
+	common.debug(str);
+
+	if (request.size === 0) {
+		common.log('Done! Total size: ' + newCollection.size);
+		return newCollection;
+	}
 	return getMessages(client, channel, filter, request.last().id, newCollection);
 }
 
 async function getShortenedMessages(client, channel, filter) {
-	let request = await getMessages(client, channel, filter)
+	let request = await getMessages(client, channel, filter);
 
 	let list = [];
 
@@ -114,7 +151,7 @@ async function getShortenedMessages(client, channel, filter) {
 			author : message.author.username + '#' + message.author.discriminator,
 			content : message.content,
 			attachments : []
-		}
+		};
 
 		if (message.attachments.size > 0) {
 			let shortenedAttachments = [];
@@ -154,4 +191,20 @@ function writeDump(dump) {
 	common.info('New dump created at \'' + path + '\'!');
 	common.mkDirByPathSync(DUMP_DIRECTORY, {isRelativeToScript: true});
 	common.saveFile(path, dump.content);
+}
+
+function logTimeTaken(ms) {
+	let seconds = Math.floor(ms / 1000);
+	let newMs = ms - seconds * 1000;
+	let minutes = Math.floor(seconds / 60);
+	let newSeconds = seconds - minutes * 60;
+	let hours = Math.floor(minutes / 60);
+	let newMinutes = minutes - hours * 60;
+
+	let hourString 	 = hours	  ? hours 	   + ' hour' 		+ (hours 	  > 1 ? 's ' : ' ')	: '';
+	let minuteString = newMinutes ? newMinutes + ' minute' 		+ (newMinutes > 1 ? 's ' : ' ')	: '';
+	let secondString = newSeconds ? newSeconds + ' second'  	+ (newSeconds > 1 ? 's ' : ' ')	: '';
+	let msString 	 = newMs 	  ? newMs 	   + ' millisecond' + (newMs 	  > 1 ? 's'  : '' )	: '';
+
+	common.log(`Time taken: ${hourString}${minuteString}${secondString}${msString}.`);
 }

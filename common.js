@@ -37,6 +37,7 @@ Storage.servers = Storage.servers || {};
 Storage.users = Storage.users || {};
 Storage.reminders = Storage.reminders || [];
 
+// SAVE FILES WITH POTENTIALLY UPDATED DATA
 saveFile(CONFIG_PATH, Config);
 saveFile(DATA_PATH, Storage);
 saveFile(BLOCKED_PATH, Blocked);
@@ -44,7 +45,28 @@ saveFile(DELETED_PATH, Deleted);
 saveFile(EDITED_PATH, Edited);
 
 // ENUM
+/*
+	'args' property for commands:
+	NULL:		command doesn't have its own execute function
+				'' 		❌
+				'foo'	❌
+	NONE: 		arguments are NOT ACCEPTED
+				'' 		✔
+				'foo'	❌
+	OPTIONAL: 	arguments are OPTIONAL
+				'' 		✔
+				'foo'	✔
+	REQUIRED: 	arguments are REQUIRED
+				'' 		❌
+				'foo'	✔
+
+	⚠ THIS DOES NOT INCLUDE SUB-COMMANDS ⚠
+	* A command with only sub-commands but no standalone function is NONE
+	* A command with sub-commands and a standalone function can be OPTIONAL or REQUIRED,
+		 depending on whether the standalone function CAN or MUST receive an argument.
+ */
 let argumentValues = {
+	NULL : -1,
 	NONE : 0,
 	OPTIONAL : 1,
 	REQUIRED : 2
@@ -57,27 +79,20 @@ module.exports = {
 	loadFile, saveFile,
 	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited,
 	argumentValues,
-	info, warn, debug,
-	sendDM,
+	debug, log, info, warn,
+	getDmChannel,
 	updatePresence,
-	unparseDate,
+	parseDate,
 	sendWednesday,
 	combineCommandChain,
 	getHelpRow, getCommandHelp, getFullHelpEmbed,
+	waterTimers, runningTimers,
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
-	mkDirByPathSync
+	mkDirByPathSync, getBooleanValue
 };
 
 //// METHODS
 // CONSOLE
-function info(msg) {
-	console.log('\x1b[33m%s\x1b[0m', `[INFO] ${msg}`);
-}
-
-function warn(msg) {
-	console.log('\x1b[31m%s\x1b[0m', `[WARN] ${msg}`);
-}
-
 function debug(msg) {
 	if (Config.debug) {
 		if (msg instanceof Object) {
@@ -89,21 +104,38 @@ function debug(msg) {
 	}
 }
 
+function log(msg) {
+	if (msg instanceof Object) {
+		console.log('\x1b[2m%s\x1b[0m', '[LOG]');
+		console.log(msg);
+	} else {
+		console.log('\x1b[2m%s\x1b[0m', `[LOG] ${msg}`);
+	}
+}
+
+function info(msg) {
+	console.log('\x1b[33m%s\x1b[0m', `[INFO] ${msg}`);
+}
+
+function warn(msg) {
+	console.log('\x1b[31m%s\x1b[0m', `[WARN] ${msg}`);
+}
+
 // FILESYSTEM
-function loadFile(path, variable) {
+function loadFile(filePath, variable) {
 	let temp;
 	try {
-		temp = require(path);
-		debug('Read ' + path);
+		temp = require(filePath);
+		debug('Read ' + filePath);
 	} catch (e) {
-		fs.writeFileSync(path, JSON.stringify(variable, null, 2));
-		info('Created ' + path);
+		fs.writeFileSync(filePath, JSON.stringify(variable, null, 2));
+		info('Created ' + filePath);
 	}
 	return temp || variable;
 }
 
-function saveFile(path, variable) {
-	fs.writeFileSync(path, JSON.stringify(variable, null, 2));
+function saveFile(filePath, variable) {
+	fs.writeFileSync(filePath, JSON.stringify(variable, null, 2));
 }
 
 // SPECIFIC SAVES
@@ -114,20 +146,6 @@ function saveDeleted() 	{saveFile(DELETED_PATH, Deleted);	}
 function saveEdited() 	{saveFile(EDITED_PATH, 	Edited);	}
 
 // HELPERS
-/**
- * Send a DM to a user.
- * Should the DM channel not exist, it will be created first.
- *
- * @param userId
- * @param message
- * @returns {Promise<*>}
- */
-async function sendDM(userId, message) {
-	let cur = client.users.get(userId);
-	let channel = await cur.createDM();
-	return channel.send(message);
-}
-
 function updatePresence(status = 'online', name = Config.prefix + 'help', type = 'LISTENING', url = 'https://www.github.com/Kaeks/wiktor-bot') {
 	client.user.setStatus(status)
 		.catch(console.error);
@@ -140,7 +158,7 @@ function updatePresence(status = 'online', name = Config.prefix + 'help', type =
 	}).catch(console.error);
 }
 
-function unparseDate(date) {
+function parseDate(date) {
 	let dateString;
 	if (Date.compare(Date.parse(date), (1).day().fromNow()) === 1) {
 		if (Date.compare(Date.parse(date), (1).year().fromNow()) === 1) {
@@ -209,7 +227,7 @@ function getCommandHelp(command, commandChain = []) {
 			}
 			info(`Command '${commandString}' has usage property, but no description property.`)
 		}
-	} else if (!(command.hasOwnProperty('args') && command.args)) info(`Command '${commandString}' doesn't have a usage property.`);
+	} else if ([argumentValues.OPTIONAL, argumentValues.REQUIRED].includes(command.args)) info(`Command '${commandString}' doesn't have a usage property.`);
 
 	if (command.hasOwnProperty('sub')) {
 		let subs = command.sub;
@@ -238,82 +256,89 @@ function getFullHelpEmbed(msg, embed) {
 /**
  * Sends an image of the wednesday frog to the specified channel
  *
- * @param channelId
+ * @param channel
  */
-function sendWednesday(channelId) {
+function sendWednesday(channel) {
 	let embed = new Discord.RichEmbed()
 		.setTitle('It is Wednesday, my dudes.')
 		.setColor(0x00AE86)
 		.setImage('https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg');
-	client.channels.get(channelId).send({embed});
+	channel.send({embed});
 }
 
 // WATER
-function sendWater(userId) {
-	let user = client.users.get(userId);
-	runningTimers[userId].started = (new Date()).getTime();
-	if (user.presence.status === 'offline' || user.presence.status === 'dnd') {
+async function sendWater(user) {
+	runningTimers[user.id].started = new Date();
+	if (user.presence.status === 'offline' || (user.presence.status === 'dnd' && Storage.users[user.id].water.ignoreDnD !== true)) {
 		return false;
 	}
 	let embed = new Discord.RichEmbed()
 		.setTitle('Stay hydrated!')
 		.setDescription('Drink some water **now**.')
 		.setThumbnail('https://media.istockphoto.com/photos/splash-fresh-drop-in-water-close-up-picture-id801948192');
-	return sendDM(userId, {embed});
+	let channel = await getDmChannel(user);
+	channel.send({embed});
 }
 
-function addWaterTimer(user, interval) {
-	waterTimers[user] = interval;
+function addWaterTimer(user) {
+	waterTimers[user.id] = Storage.users[user.id].water.interval;
 }
 
 function loadWaterTimers() {
-	for (let user in Storage.users) {
-		if (!Storage.users.hasOwnProperty(user)) continue;
-		if (!Storage.users[user].hasOwnProperty('water')) continue;
-		if (Storage.users[user].water.enabled === true) {
-			addWaterTimer(user, Storage.users[user].water.interval);
+	for (let userId in Storage.users) {
+		if (!Storage.users.hasOwnProperty(userId)) continue;
+		if (!Storage.users[userId].hasOwnProperty('water')) continue;
+		if (Storage.users[userId].water.enabled === true) {
+			let user = client.users.get(userId);
+			addWaterTimer(user);
 		}
 	}
 }
 
-function startWaterTimer(userId) {
-	let now = (new Date()).getTime();
-	common.debug('[startWaterTimer]: ' + waterTimers[userId]);
-	common.debug(waterTimers);
-	let curTimer = setInterval(function() {
-		sendWater(userId);
-	}, waterTimers[userId] * 60000);
-	if (runningTimers[userId] == null) {
-		runningTimers[userId] = {};
+function startWaterTimer(user) {
+	let now = new Date();
+	let timer = setInterval(function() {
+		sendWater(user);
+	}, waterTimers[user.id]  * 60 * 1000);
+	if (runningTimers[user.id] === undefined) {
+		runningTimers[user.id] = {};
 	}
-	runningTimers[userId].timer = curTimer;
-	runningTimers[userId].started = now;
+	runningTimers[user.id].timer = timer;
+	runningTimers[user.id].started = now;
+	debug('Started water timer for ' + user.username + '#' + user.discriminator);
 }
 
 function startAllWaterTimers() {
-	for (let userId in waterTimers) {
-		if (!waterTimers.hasOwnProperty(userId)) continue;
-		startWaterTimer(userId);
+	for (let userEntry in waterTimers) {
+		if (!waterTimers.hasOwnProperty(userEntry)) continue;
+		let user = client.users.get(userEntry);
+		startWaterTimer(user);
 	}
 }
 
-function stopWaterTimer(userId) {
-	if (runningTimers[userId] == null) {
+function stopWaterTimer(user) {
+	if (runningTimers[user.id] === undefined) {
 		return false;
 	}
-	clearInterval(runningTimers[userId].timer);
-	runningTimers[userId] = null;
+	clearInterval(runningTimers[user.id].timer);
+	runningTimers[user.id] = undefined;
 }
 
-function updateWaterTimer(userId) {
-	stopWaterTimer(userId);
-	waterTimers[userId] = Storage.users[userId].water.interval;
-	startWaterTimer(userId);
+function updateWaterTimer(user) {
+	stopWaterTimer(user);
+	waterTimers[user.id] = Storage.users[user.id].water.interval;
+	startWaterTimer(user);
 }
 
-function getWaterTimerStatus(userId) {
-	let now = (new Date()).getTime();
-	return (runningTimers[userId].started + waterTimers[userId] * 1000) - now;
+function getWaterTimerStatus(user) {
+	let now = new Date();
+	debug(now);
+	let started = runningTimers[user.id].started;
+	let future = new Date(started.getTime() + waterTimers[user.id] * 60 * 1000);
+	debug(future);
+	let diff = future - now;
+	debug(diff);
+	return diff;
 }
 
 // filesystem helper method ripped off SO
@@ -344,4 +369,19 @@ function mkDirByPathSync(targetDir, { isRelativeToScript = false } = {}) {
 
 		return curDir;
 	}, initDir);
+}
+
+async function getDmChannel(user) {
+	if (user.dmChannel != null) return user.dmChannel;
+	return await user.createDM();
+}
+
+function getBooleanValue(suffix) {
+	let newVal;
+	if (suffix === 'true') {
+		newVal = true;
+	} else if (suffix === 'false') {
+		newVal = false;
+	}
+	return newVal
 }

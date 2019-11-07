@@ -1,12 +1,5 @@
 const common = require('../common.js');
 
-/*
-	'args' property:
-	0: NO arguments
-	1: OPTIONAL arguments
-	2: REQUIRES arguments
- */
-
 module.exports = {
 	name : 'example',
 	args : common.argumentValues.OPTIONAL,

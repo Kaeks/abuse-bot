@@ -12,7 +12,7 @@ const DEFAULT_WATER_INTERVAL = 60;
 
 module.exports = {
 	name : 'water',
-	args : common.argumentValues.REQUIRED,
+	args : common.argumentValues.NULL,
 	sub : [
 		{
 			name : 'status',
@@ -25,7 +25,8 @@ module.exports = {
 					msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
 					return false;
 				}
-				let seconds = Math.floor(getWaterTimerStatus(user.id) / 1000);
+				let milliseconds = getWaterTimerStatus(user);
+				let seconds = Math.floor(milliseconds / 1000);
 				let minutes = Math.floor(seconds / 60);
 				let newSeconds = seconds - minutes * 60;
 				let string = minutes + ' minutes, ' + newSeconds + ' seconds';
@@ -42,7 +43,6 @@ module.exports = {
 				let storageUser = Storage.users[user.id];
 				storageUser = storageUser || {};
 				storageUser.water = storageUser.water || {};
-				common.debug(storageUser);
 				if (checkWaterMember(user)) {
 					msg.channel.send('You are already a member of the water club!');
 					return;
@@ -50,9 +50,8 @@ module.exports = {
 				storageUser.water.enabled = true;
 				storageUser.water.interval = storageUser.water.interval || DEFAULT_WATER_INTERVAL;
 				saveData();
-				common.debug(storageUser);
 				msg.channel.send('Welcome to the water club, ' + msg.author + '!\nYou will be notified every ' + DEFAULT_WATER_INTERVAL + ' minutes (default value).');
-				addWaterTimer(user.id, storageUser.water.interval);
+				addWaterTimer(user);
 			}
 		},
 		{
@@ -69,12 +68,12 @@ module.exports = {
 				Storage.users[user.id].water.enabled = false;
 				saveData();
 				msg.channel.send('You have left the water club. Sad to see you go! :(');
-				stopWaterTimer(user.id);
+				stopWaterTimer(user);
 			}
 		},
 		{
 			name : 'interval',
-			args : common.argumentValues.OPTIONAL,
+			args : common.argumentValues.NONE,
 			sub : [
 				{
 					name : 'set',
@@ -96,7 +95,7 @@ module.exports = {
 								msg.channel.send('Water interval has been set to ' + newInterval + ' minutes.');
 								common.debug(waterTimers);
 								common.debug(runningTimers);
-								updateWaterTimer(user.id);
+								updateWaterTimer(user);
 								common.debug(waterTimers);
 								common.debug(runningTimers);
 							} else {
@@ -118,6 +117,39 @@ module.exports = {
 				}
 				let userInterval = Storage.users[user.id].water.interval;
 				msg.channel.send('Your interval is set to ' + userInterval + ' minutes.');
+			}
+		},
+		{
+			name : 'ignorednd',
+			args : common.argumentValues.NONE,
+			sub : [
+				{
+					name : 'set',
+					args : common.argumentValues.REQUIRED,
+					usage : [ '<true|false>' ],
+					description : [ 'Set whether or not I should ignore your DnD status and send you water reminders regardless.' ],
+					execute(msg, suffix) {
+						let newVal = common.getBooleanValue(suffix);
+						if (newVal === undefined) {
+							msg.channel.send('Must be `true` or `false`.').then((message => message.delete(3000)));
+							return false;
+						}
+						let user = msg.author;
+						Storage.users[user.id].water.ignoreDnD = newVal;
+						msg.channel.send('I am going to ' + (newVal ? 'ignore' : 'respect') + ' your DnD status from now on.');
+						saveData();
+					}
+				}
+			],
+			usage : [ '' ],
+			description : [ 'View whether I ignore your DnD status.' ],
+			execute(msg) {
+				let user = msg.author;
+				if (Storage.users[user.id].water.ignoreDnD === true) {
+					msg.channel.send('I am currently ignoring your DnD status.');
+				} else {
+					msg.channel.send('I am currently respecting your DnD status.');
+				}
 			}
 		}
 	]

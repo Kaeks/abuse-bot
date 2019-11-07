@@ -8,7 +8,7 @@ const Discord = require('discord.js');
 
 module.exports = {
 	name : 'wednesday',
-	args : common.argumentValues.OPTIONAL,
+	args : common.argumentValues.NONE,
 	sub : [
 		{
 			name : 'enable',
@@ -44,24 +44,24 @@ module.exports = {
 		},
 		{
 			name : 'channel',
-			args : common.argumentValues.OPTIONAL,
+			args : common.argumentValues.NONE,
 			sub : [
 				{
 					name : 'set',
 					args : common.argumentValues.OPTIONAL,
 					usage : '[textChannel]',
 					description : 'Set channel for Wednesdays.',
-					execute (msg) {
+					execute (msg, suffix) {
 						if (checkDmOrGroup(msg)) {
 							msg.channel.send('Cannot be used in (group) DMs.').then((message => message.delete(5000)));
 							return false;
 						}
 						let server = msg.guild.id;
 						let channel;
-						if (args[2]) {
-							channel = msg.mentions.channels.first();
-						} else {
+						if (suffix == null) {
 							channel = msg.channel;
+						} else {
+							channel = msg.mentions.channels.first();
 						}
 						Storage.servers[server].channels = Storage.servers[server].channels || {};
 						Storage.servers[server].channels.wednesday = channel.id;
@@ -89,11 +89,11 @@ module.exports = {
 			usage : '',
 			description : 'Subscribe to the private Wednesday service.',
 			execute (msg) {
-				let author = msg.author.id;
-				if (Storage.users[author].wednesday === true) {
+				let user = msg.author;
+				if (isSubscribed(user)) {
 					msg.channel.send('You are already subscribed to the private Wednesday service.');
 				} else {
-					Storage.users[author].wednesday = true;
+					Storage.users[user.id].wednesday = true;
 					msg.channel.send('You are now subscribed to the private Wednesday service.');
 					saveData();
 				}
@@ -105,9 +105,9 @@ module.exports = {
 			usage : '',
 			description : 'Unsubscribe from the private Wednesday service.',
 			execute (msg) {
-				let author = msg.author.id;
-				if (Storage.users[author].wednesday === true) {
-					Storage.users[author].wednesday = false;
+				let user = msg.author;
+				if (isSubscribed(user)) {
+					Storage.users[user.id].wednesday = false;
 					msg.channel.send('You are no longer subscribed to the private Wednesday service.');
 					saveData();
 				} else {
@@ -120,21 +120,22 @@ module.exports = {
 			args : common.argumentValues.NONE,
 			usage : '',
 			description : 'Simulate a Wednesday.',
-			execute (msg) {
-				let author = msg.author.id;
+			async execute (msg) {
+				let user = msg.author;
 				if (msg.channel.type === 'dm' || msg.channel.type === 'group') {
-					if (Storage.users[author].wednesday === true) {
-						sendWednesday(client.users.get(author).dmChannel.id);
+					if (isSubscribed(user)) {
+						sendWednesday(await common.getDmChannel(user));
 					} else {
 						msg.channel.send('You need to subscribe to the Wednesday frog service first.');
 					}
 				}
 				if (msg.channel.type === 'text') {
-					let server = msg.guild.id;
-					if (Storage.servers[server].channels.hasOwnProperty('wednesday')) {
-						if (Storage.servers[server].disabledFeatures.wednesday !== true) {
-							let channelID = Storage.servers[server].channels.wednesday;
-							sendWednesday(channelID);
+					let server = msg.guild;
+					if (Storage.servers[server.id].channels.hasOwnProperty('wednesday')) {
+						if (Storage.servers[server.id].disabledFeatures.wednesday !== true) {
+							let channelEntry = Storage.servers[server.id].channels.wednesday;
+							let channel = msg.client.channels.get(channelEntry);
+							sendWednesday(channel);
 						} else {
 							msg.channel.send('This server has disabled the Wednesday frog service.');
 						}
@@ -156,12 +157,11 @@ module.exports = {
 	}
 };
 
-function prepareUser(msg) {
-	let author = msg.author.id;
-	if (!Storage.users.hasOwnProperty(author)) {
-		Storage.users[author] = {};
-		saveData();
-	}
+function isSubscribed(user) {
+	let userEntry = Storage.users[user.id];
+	userEntry = userEntry || {};
+	userEntry.wednesday = userEntry.wednesday || false;
+	return userEntry.wednesday === true;
 }
 
 function checkDmOrGroup(msg) {

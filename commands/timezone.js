@@ -2,7 +2,7 @@ const common = require('../common.js');
 const Storage = require('../data.json');
 module.exports = {
 	name : 'timezone',
-	args : common.argumentValues.OPTIONAL,
+	args : common.argumentValues.NONE,
 	sub : [
 		{
 			name : 'set',

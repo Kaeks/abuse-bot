@@ -5,13 +5,13 @@ const {
 	loadFile, saveFile,
 	saveData, saveBlocked, saveDeleted, saveEdited, saveConfig,
 	waterTimers, runningTimers,
-	sendDM, sendWednesday
+	sendWednesday
 } = common;
 const Discord = require('discord.js');
 
 module.exports = {
 	name : 'config',
-	args : common.argumentValues.REQUIRED,
+	args : common.argumentValues.NULL,
 	sub : [
 		{
 			name : 'prefix',
@@ -48,22 +48,19 @@ module.exports = {
 				'Enable/disable debug logging'
 			],
 			execute(msg, suffix) {
-
-			}
-		}
-	],
-	execute(msg, suffix) {if (args[0] === 'debug') {
-			if (args.length === 1) {
-				msg.channel.send('`debug` is set to `' + Storage.debug + '`.');
-			} else {
-				if (args[1] === 'true' || args[1] === 'false') {
-					Config.debug = args[1];
-					msg.channel.send('`debug` has been set to `' + args[1] + '`.');
-					saveData();
+				if (suffix == null) {
+					msg.channel.send('`debug` is set to `' + Config.debug + '`.');
 				} else {
-					msg.channel.send('Excuse me, what the frick?').then((message => message.delete(3000)));
+					let newVal = common.getBooleanValue(suffix);
+					if (newVal === undefined) {
+						msg.channel.send('Must be `true` or `false`.').then((message => message.delete(3000)));
+						return false;
+					}
+					Config.debug = newVal;
+					msg.channel.send('`debug` has been set to `' + suffix + '`.');
+					saveConfig();
 				}
 			}
 		}
-	}
+	]
 };

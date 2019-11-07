@@ -13,7 +13,7 @@ module.exports = {
 		'Show help for all commands.',
 		'Show help for <command>'
 	],
-	execute(msg, suffix) {
+	async execute(msg, suffix) {
 		const { commands } = msg.client;
 
 		let embed = new Discord.RichEmbed().setColor(0x00AE86);
@@ -21,7 +21,9 @@ module.exports = {
 		if (suffix == null) {
 			embed.setTitle('Help for all commands');
 			common.getFullHelpEmbed(msg, embed);
-			common.sendDM(msg.author.id,{embed});
+			let user = msg.author;
+			let channel = await common.getDmChannel(user);
+			channel.send({embed});
 		} else {
 			const commandName = suffix.split(' ')[0].toLowerCase();
 			common.debug('commandName: ' + commandName);

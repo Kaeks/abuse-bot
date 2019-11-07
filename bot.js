@@ -14,10 +14,9 @@ const common = require('./common.js');
 const {
 	fs,
 	Config, Storage, Blocked, Deleted, Edited,
-	loadFile, saveFile,
 	saveData, saveBlocked, saveDeleted, saveEdited,
 	waterTimers, runningTimers,
-	sendDM, updatePresence,
+	updatePresence,
 	sendWednesday
 } = common;
 
@@ -36,19 +35,18 @@ client.on('ready', () => {
 	updatePresence();
 
 	let now = new Date();
-	common.debug(now.toString());
+	common.log(now.toString());
 
 	for (let guild of client.guilds) {
 		setUpServer(guild[1]);
 	}
 
-	//loadWaterTimers();
+	common.loadWaterTimers();
 	common.debug(waterTimers);
 	common.debug(runningTimers);
-	//startAllWaterTimers();
+	common.startAllWaterTimers();
 	common.debug(runningTimers);
 
-	common.debug(Storage);
 	saveData();
 
 });
@@ -58,9 +56,11 @@ client.on('message', msg => {
 	if (msg.author.id === client.user.id) return false;
 	if (checkMessageForCommand(msg)) {
 		if (msg.channel.type !== 'dm' && msg.channel.type !== 'group') {
-			setTimeout(function() {
-				msg.delete().catch(console.error);
-			}, 3000);
+			if (msg.guild.me.permissions.has('MANAGE_MESSAGES')) {
+				setTimeout(function() {
+					msg.delete().catch(console.error);
+				}, 3000);
+			}
 		}
 	} else {
 		// Message is not a command
@@ -99,7 +99,7 @@ client.on('messageDelete', message => {
 		// discard messages created by bots
 		return false;
 	}
-	console.log('Message by ' + message.author + ' deleted.');
+	common.log('Message by ' + message.author + ' deleted.');
 	let shortened = {
 		id: message.id,
 		type: message.type,
@@ -141,7 +141,7 @@ client.on('messageUpdate', (oldMessage, newMessage) => {
 		// discard messages created by bots
 		return false;
 	}
-	console.log('Message by ' + oldMessage.author + ' edited.');
+	common.log('Message by ' + oldMessage.author + ' edited.');
 	let combinedEntry = {
 		id: oldMessage.id,
 		type: oldMessage.type,
@@ -163,34 +163,36 @@ client.on('messageUpdate', (oldMessage, newMessage) => {
 
 // ADDED TO SERVER
 client.on('guildCreate', guild => {
-	console.log('Joined server \'' + guild.name + '\'.');
+	common.log('Joined server \'' + guild.name + '\'.');
 	setUpServer(guild);
 });
 
 // REMOVED FROM SERVER
 client.on('guildDelete', guild => {
-	console.log('Whoa whoa whoa I just got kicked from ' + guild.name);
+	common.log('Whoa whoa whoa I just got kicked from ' + guild.name);
 });
 
 //// CRON
 // WEDNESDAY
 let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
-	for (let serverId in Storage.servers) {
-		if (!Storage.servers.hasOwnProperty(serverId)) continue;
-		let cur = Storage.servers[serverId];
+	for (let serverEntry in Storage.servers) {
+		if (!Storage.servers.hasOwnProperty(serverEntry)) continue;
+		let cur = Storage.servers[serverEntry];
 		if (!cur.channels.hasOwnProperty('wednesday')) continue;
 		if (cur.disabledFeatures.wednesday !== true) {
-			let channel = cur.channels.wednesday;
+			let channelEntry = cur.channels.wednesday;
+			let channel = client.channels.get(channelEntry);
 			sendWednesday(channel);
 		}
 	}
-	for (let userId in Storage.users) {
-		if (!Storage.users.hasOwnProperty(userId)) continue;
-		let cur = Storage.users[userId];
+	for (let userEntry in Storage.users) {
+		if (!Storage.users.hasOwnProperty(userEntry)) continue;
+		let cur = Storage.users[userEntry];
 		if (cur.hasOwnProperty('wednesday')) continue;
 		if (cur.wednesday === true) {
-			let channel = await client.users.get(userId).createDM();
-			sendWednesday(channel.id);
+			let user = client.users.get(userEntry);
+			let channel = await common.getDmChannel(user);
+			sendWednesday(channel);
 		}
 	}
 }, null, true, 'Europe/Berlin');
@@ -202,7 +204,7 @@ function getTimeZone(user) {
 
 function setUpServer(server) {
 	if (!Storage.servers.hasOwnProperty(server.id)) {
-		console.log('Added \'' + server.name + '\' to server list.');
+		common.log('Added \'' + server.name + '\' to server list.');
 		Storage.servers[server.id] = {};
 	}
 	Storage.servers[server.id].channels = Storage.servers[server.id].channels || {};
@@ -212,7 +214,7 @@ function setUpServer(server) {
 
 function setUpUser(user) {
 	if (!Storage.users.hasOwnProperty(user.id)) {
-		console.log('Added \'' + user + '\' to user list.');
+		common.log('Added \'' + user + '\' to user list.');
 		Storage.users[user.id] = {};
 	}
 	Storage.users[user.id].wednesday = Storage.users[user.id].wednesday || {};
@@ -227,19 +229,24 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 	localCommandChain.push(command);
 	let commandString = common.combineCommandChain(localCommandChain);
 
-	let canExecute = false;
+	// Variable for determining whether a (sub-)command can be executed with the suffix or not
+	let isValidUse = false;
 
 	if (suffix == null) {
 		// Suffix is empty
-		if (command.args !== common.argumentValues.REQUIRED) canExecute = true;
+		// Command doesn't require arguments ✔
+		// Command doesn't have a standalone function ✔
+		if (![common.argumentValues.REQUIRED, common.argumentValues.NULL].includes(command.args)) isValidUse = true;
 	} else {
 		// Suffix is not empty
+		// Get a list individual (possible) sub-commands
 		let splitList = suffix.split(/ +/);
 		let firstArg = splitList[0];
 
 		// subIndex is the index where the sub-command lies within the list of commands
 		let subIndex = -1;
 
+		// Check whether the is a sub-command for firstArg
 		if (command.hasOwnProperty('sub')) {
 			for (let i = 0; i < command.sub.length; i++) {
 				if (command.sub[i].name === firstArg.toLowerCase()) {
@@ -249,7 +256,8 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 			}
 		}
 
-		// if there is a sub-command, go through to it
+		// If there is a sub-command, go through to it and look recursively
+		// If there is no sub-command and the current command accepts / requires arguments, continue with execution
 		if (subIndex >= 0) {
 			let temp = suffix.substring(firstArg.length);
 			let match = temp.match(/ +/);
@@ -257,15 +265,23 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 			let newSuffix = match !== null ? temp.substring(match[0].length) : null;
 			return findSubCommand(msg, newSuffix, command.sub[subIndex], localCommandChain);
 		} else if (command.args === common.argumentValues.REQUIRED || command.args === common.argumentValues.OPTIONAL) {
-			// if there is no sub-command and args are required / optional
-			canExecute = true;
+			isValidUse = true;
 		}
 	}
 
-	if (canExecute) {
-		common.debug('Executing command \'' + commandString + '\' with suffix: \'' + suffix + '\'');
-		command.execute(msg, suffix);
-		return true;
+	// If the use is valid, execute it
+	// If the use is not valid, display help
+	if (isValidUse) {
+		let suffixString = suffix == null ? '' : ' with suffix: \'' + suffix + '\'';
+		common.log('User ' + msg.author.username + '#' + msg.author.discriminator + ' issued command \'' + commandString + '\'' + suffixString + '.');
+		if (command.hasOwnProperty('execute')) {
+			command.execute(msg, suffix);
+			return true;
+		} else {
+			common.warn('Command \'' + commandString + '\' has not been implemented.');
+			msg.channel.send('This command doesn\'t have an implemented function.');
+			return false;
+		}
 	} else {
 		let embed = new Discord.RichEmbed()
 			.setColor('00AE86')
