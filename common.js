@@ -88,7 +88,7 @@ module.exports = {
 	getHelpRow, getCommandHelp, getFullHelpEmbed,
 	waterTimers, runningTimers,
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
-	getBooleanValue
+	getBooleanValue, getUsers
 };
 
 //// METHODS
@@ -342,6 +342,7 @@ function getWaterTimerStatus(user) {
 }
 
 async function getDmChannel(user) {
+	if (user.bot) return undefined;
 	if (user.dmChannel != null) return user.dmChannel;
 	return await user.createDM();
 }
@@ -355,3 +356,5 @@ function getBooleanValue(suffix) {
 	}
 	return newVal
 }
+
+function getUsers() {return client.users.filter(user => {return user.bot === false})}

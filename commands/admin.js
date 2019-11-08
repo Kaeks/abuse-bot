@@ -91,39 +91,90 @@ async function createDump(msg, suffix, type) {
 		writeDump(dump, 'channel/' + channel.id);
 	} else if (type === DUMP_TYPE.SERVER) {
 		let server = suffix == null ? msg.guild : client.guilds.get(suffix);
-		await createServerDump(msg, server);
+		let dumps = await getServerDumps(msg, server);
+		for (let dump of dumps) {
+			writeDump(dump, 'server/' + server.id);
+		}
 	} else if (type === DUMP_TYPE.ALL) {
 		await createFullDump(msg);
 	}
 }
 
 async function createFullDump(msg) {
+	let client = msg.client;
 	common.info('Creating full dump of all channels!');
-	let channels = msg.client.channels;
-	let now = new Date();
-	for (const channelEntry of channels) {
-		let channel = channelEntry[1];
-		let dump = await getChannelDump(msg, channel);
-		writeDump(dump, 'full/' + generateDateFileName(now));
+	let before = new Date();
+	let dumpDirectory = 'full/' + generateDateFileName(before) + '/';
+
+	let msgAmt = 0;
+
+	// Get all users
+	let users = common.getUsers();
+	// -> Cache all available DM channels
+	for (let userEntry of users) {
+		let user = userEntry[1];
+		let dmChannel = await common.getDmChannel(user);
+		let dump = await getChannelDump(msg, dmChannel);
+		writeDump(dump, dumpDirectory + 'dm/' + user.id);
+		msgAmt += dump.messages.length;
 	}
+
+	// Get all group DMs
+	let groupDmChannels = client.channels.filter(channel => {return channel.type === 'group'});
+	for (let groupDmChannelEntry of groupDmChannels) {
+		let groupDmChannel = groupDmChannelEntry[1];
+		let dump = await getChannelDump(msg, groupDmChannel);
+		writeDump(dump, dumpDirectory + 'group/' + groupDmChannel.id);
+		msgAmt += dump.messages.length;
+	}
+
+	let serverChannelAmt = 0;
+
+	// Get all servers
+	let servers = client.guilds;
+	for (let serverEntry of servers) {
+		let server = serverEntry[1];
+		let dumps = await getServerDumps(msg, server);
+		serverChannelAmt += dumps.length;
+		for (let dump of dumps) {
+			writeDump(dump, dumpDirectory + 'server/' + server.id);
+			msgAmt += dump.messages.length;
+		}
+	}
+
+	let dmAmt = users.size;
+	let groupAmt = groupDmChannels.size;
+	let serverAmt = servers.size;
+
+	common.log('Done! Servers: ' + serverAmt + ' with ' + serverChannelAmt + ' channels, Groups: ' + groupAmt + ', DMs: ' + dmAmt);
+	common.log('Total channels: ' + (dmAmt + groupAmt + serverChannelAmt));
+	common.log('Grand total of messages: ' + msgAmt);
+
+	let after = new Date();
+	let timeDiff = after - before;
+	logTimeTaken(timeDiff);
+
+	common.log((msgAmt / (timeDiff / 1000)).toFixed(2) + ' messages per second.');
 }
 
-async function createServerDump(msg, server) {
+async function getServerDumps(msg, server) {
 	common.info('Creating dump for server \'' + server + '\' (' + server.id + ')');
 	let filtered = server.channels.filter(val => {return val.type === 'text'});
 	let before = new Date();
 	let msgCounter = 0;
+	let dumps = [];
 	for (const channelEntry of filtered) {
 		let channel = channelEntry[1];
 		let dump = await getChannelDump(msg, channel);
 		msgCounter += dump.messages.length;
-		writeDump(dump, 'server/' + server.id);
+		dumps.push(dump);
 	}
 	common.log('Done! Channels: ' + filtered.size + ', Total messages: ' + msgCounter);
 	let after = new Date();
 	let timeDiff = after - before;
 	logTimeTaken(timeDiff);
 	common.log((msgCounter / (timeDiff / 1000)).toFixed(2) + ' messages per second.');
+	return dumps;
 }
 
 async function getChannelDump(msg, channel) {
