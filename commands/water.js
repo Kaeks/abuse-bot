@@ -45,7 +45,7 @@ module.exports = {
 				storageUser.water = storageUser.water || {};
 				if (checkWaterMember(user)) {
 					msg.channel.send('You are already a member of the water club!');
-					return;
+					return false;
 				}
 				storageUser.water.enabled = true;
 				storageUser.water.interval = storageUser.water.interval || DEFAULT_WATER_INTERVAL;
@@ -129,12 +129,16 @@ module.exports = {
 					usage : [ '<true|false>' ],
 					description : [ 'Set whether or not I should ignore your DnD status and send you water reminders regardless.' ],
 					execute(msg, suffix) {
+						let user = msg.author;
+						if (!checkWaterMember(user)) {
+							msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+							return false;
+						}
 						let newVal = common.getBooleanValue(suffix);
 						if (newVal === undefined) {
 							msg.channel.send('Must be `true` or `false`.').then((message => message.delete(3000)));
 							return false;
 						}
-						let user = msg.author;
 						Storage.users[user.id].water.ignoreDnD = newVal;
 						msg.channel.send('I am going to ' + (newVal ? 'ignore' : 'respect') + ' your DnD status from now on.');
 						saveData();
@@ -145,6 +149,10 @@ module.exports = {
 			description : [ 'View whether I ignore your DnD status.' ],
 			execute(msg) {
 				let user = msg.author;
+				if (!checkWaterMember(user)) {
+					msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+					return false;
+				}
 				if (Storage.users[user.id].water.ignoreDnD === true) {
 					msg.channel.send('I am currently ignoring your DnD status.');
 				} else {

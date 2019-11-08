@@ -44,7 +44,7 @@ module.exports = {
 					args : common.argumentValues.NONE,
 					usage : '',
 					description : 'Remove all of your reminders.',
-					execute(msg, suffix) {
+					execute(msg) {
 						for (let i = 0; i < Storage.reminders.length; i++) {
 							if (Storage.reminders[i].user === msg.author.id) {
 								Storage.reminders[i] = null;
@@ -65,7 +65,7 @@ module.exports = {
 			args : common.argumentValues.NONE,
 			usage : '',
 			description : 'List all reminders',
-			execute(msg, suffix) {
+			execute(msg) {
 				let tempReminders = [];
 				for (let i = 0; i < Storage.reminders.length; i++) {
 					if (Storage.reminders[i].user === msg.author.id) {

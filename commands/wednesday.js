@@ -23,7 +23,7 @@ module.exports = {
 				let server = msg.guild.id;
 				Storage.servers[server].disabledFeatures.wednesday = false;
 				msg.channel.send('Wednesdaily frog has been enabled. :frog:');
-
+				saveData();
 			}
 		},
 		{

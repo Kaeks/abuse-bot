@@ -1,12 +1,12 @@
 const common = require('../common.js');
-const { Config } = common;
+const { fs, Config } = common;
 const Discord = require('discord.js');
-const DUMP_DIRECTORY = 'dumps/';
+const DUMP_DIRECTORY = 'dumps';
 const DUMP_TYPE = {
 	ALL : 'all',
-	DM : 'dm',
 	SERVER : 'server',
-	CHANNEL : 'channel'
+	CHANNEL : 'channel',
+	DM :'dm'
 };
 
 module.exports = {
@@ -40,11 +40,7 @@ module.exports = {
 					usage : [ '[userId]' ],
 					description : [ 'Dumps all direct messages with a user. This user if ID is not specified.' ],
 					async execute(msg, suffix) {
-						let client = msg.client;
-						let user = suffix == null ? msg.author : client.users.get(suffix);
-						let channel = await common.getDmChannel(user);
-						let dump = await createDump(msg, client, DUMP_TYPE.DM, channel);
-						writeDump(dump);
+						await createDump(msg, suffix, DUMP_TYPE.DM);
 					}
 				},
 				{
@@ -53,50 +49,116 @@ module.exports = {
 					usage : [ '[id]' ],
 					description : [ 'Dumps all messages in a channel. This channel if ID is not specified.' ],
 					async execute(msg, suffix) {
-						let client = msg.client;
 						let channel = suffix == null ? msg.channel : client.channels.get(suffix);
-						let dump = await createDump(msg, client, DUMP_TYPE.CHANNEL, channel);
-						writeDump(dump);
+						let type = channel.type === 'dm' ? DUMP_TYPE.DM : DUMP_TYPE.CHANNEL;
+						await createDump(msg, suffix, type);
 					}
 				},
 				{
 					name : 'server',
 					args : common.argumentValues.OPTIONAL,
 					usage : [ '[id]' ],
-					description : [ 'Dumps all messages in a server. This server if ID is not specified.' ]
+					description : [ 'Dumps all messages in a server. This server if ID is not specified.' ],
+					async execute(msg, suffix) {
+						await createDump(msg, suffix, DUMP_TYPE.SERVER);
+					}
 				},
 				{
 					name : 'all',
 					args : common.argumentValues.NONE,
 					usage : [ '' ],
-					description : [ 'Dumps all messages.' ]
+					description : [ 'Dumps all messages.' ],
+					async execute(msg, suffix) {
+						await createDump(msg, suffix, DUMP_TYPE.ALL)
+					}
 				}
 			]
 		}
 	],
 };
 
-async function createDump(msg, client, type, channel) {
+async function createDump(msg, suffix, type) {
 	if (Object.values(DUMP_TYPE).indexOf(type) === -1) throw `Invalid type ${type}.`;
+	let client = msg.client;
+	if (type === DUMP_TYPE.DM) {
+		let user = suffix == null ? msg.author : client.users.get(suffix);
+		let channel = await common.getDmChannel(user);
+		let dump = await getChannelDump(msg, channel);
+		writeDump(dump, 'dm/' + user.id);
+	} else if (type === DUMP_TYPE.CHANNEL) {
+		let channel = suffix == null ? msg.channel : client.channels.get(suffix);
+		let dump = await getChannelDump(msg, channel);
+		writeDump(dump, 'channel/' + channel.id);
+	} else if (type === DUMP_TYPE.SERVER) {
+		let server = suffix == null ? msg.guild : client.guilds.get(suffix);
+		await createServerDump(msg, server);
+	} else if (type === DUMP_TYPE.ALL) {
+		await createFullDump(msg);
+	}
+}
+
+async function createFullDump(msg) {
+	common.info('Creating full dump of all channels!');
+	let channels = msg.client.channels;
+	let now = new Date();
+	for (const channelEntry of channels) {
+		let channel = channelEntry[1];
+		let dump = await getChannelDump(msg, channel);
+		writeDump(dump, 'full/' + generateDateFileName(now));
+	}
+}
+
+async function createServerDump(msg, server) {
+	common.info('Creating dump for server \'' + server + '\' (' + server.id + ')');
+	let filtered = server.channels.filter(val => {return val.type === 'text'});
+	let before = new Date();
+	let msgCounter = 0;
+	for (const channelEntry of filtered) {
+		let channel = channelEntry[1];
+		let dump = await getChannelDump(msg, channel);
+		msgCounter += dump.messages.length;
+		writeDump(dump, 'server/' + server.id);
+	}
+	common.log('Done! Channels: ' + filtered.size + ', Total messages: ' + msgCounter);
+	let after = new Date();
+	let timeDiff = after - before;
+	logTimeTaken(timeDiff);
+	common.log((msgCounter / (timeDiff / 1000)).toFixed(2) + ' messages per second.');
+}
+
+async function getChannelDump(msg, channel) {
 	if (!['dm', 'group', 'text'].includes(channel.type)) throw 'Channel is not a text based channel.';
 
+	let channelInfo = {};
 	// get channel name
 	let str = 'Creating dump for ';
-	str +=
-		type === DUMP_TYPE.DM ? 'DM channel with ' + channel.recipient.username + '#' + channel.recipient.discriminator + ' (' + channel.recipient.id + ')' :
-			type === DUMP_TYPE.CHANNEL ? 'channel \'' + channel.name + '\' (' + channel.id + ')' :
-				type === DUMP_TYPE.SERVER ? 'server \'' + channel.guild.name + '\' (' + channel.guild.id + ')' :
-					type === DUMP_TYPE.ALL ? 'EVERYTHING' : 'nothing';
+	if (channel.type === 'dm') {
+		str += 'DM channel with ' + channel.recipient.username + '#' + channel.recipient.discriminator + ' (' + channel.recipient.id + ')';
+		channelInfo.recipient = {
+			handle : channel.recipient.username + '#' + channel.recipient.discriminator,
+			id : channel.recipient.id
+		}
+	} else if (channel.type === 'group') {
+		str += 'group channel (' + channel.id + ')';
+	} else if (channel.type === 'text') {
+		str += 'channel \'' + channel.name + '\' (' + channel.id + ')';
+		channelInfo.name = channel.name;
+		channelInfo.server = {
+			id : channel.guild.id,
+			name : channel.guild.name
+		}
+	}
+
 	common.info(str);
 
 	let before = new Date();
-	let messages = await getShortenedMessages(client, channel);
+	let messages = await getShortenedMessages(channel);
 	let after = new Date();
 	let timeDiff = after - before;
 	logTimeTaken(timeDiff);
 	common.log((messages.length / (timeDiff / 1000)).toFixed(2) + ' messages per second.');
 
-	let content = {
+	return {
 		issued : {
 			on : before,
 			in : {
@@ -108,15 +170,16 @@ async function createDump(msg, client, type, channel) {
 				id : msg.author.id
 			}
 		},
+		channel : {
+			id : channel.id,
+			type : channel.type,
+			info : channelInfo
+		},
 		messages : messages
-	};
-	return {
-		type : type,
-		content : content
 	};
 }
 
-async function getMessages(client, channel, filter, start, collection = new Discord.Collection()) {
+async function getMessages(channel, filter, start, collection = new Discord.Collection()) {
 	common.debug('Getting messages...');
 	let options = {
 		limit : 100
@@ -137,11 +200,11 @@ async function getMessages(client, channel, filter, start, collection = new Disc
 		common.log('Done! Total size: ' + newCollection.size);
 		return newCollection;
 	}
-	return getMessages(client, channel, filter, request.last().id, newCollection);
+	return getMessages(channel, filter, request.last().id, newCollection);
 }
 
-async function getShortenedMessages(client, channel, filter) {
-	let request = await getMessages(client, channel, filter);
+async function getShortenedMessages(channel, filter) {
+	let request = await getMessages(channel, filter);
 
 	let list = [];
 
@@ -174,23 +237,28 @@ async function getShortenedMessages(client, channel, filter) {
 	return list;
 }
 
-function generateDumpName(dump) {
-	let now = new Date();
-	let year = now.getFullYear(),
-		month = now.getMonth(),
-		day = now.getDay(),
-		hours = now.getHours(),
-		minutes = now.getMinutes(),
-		seconds = now.getSeconds();
-	return `dump_${dump.type}_${year}-${month}-${day}_${hours}-${minutes}-${seconds}.json`
+function generateDateFileName(date) {
+	let year = date.getFullYear(),
+		month = date.getMonth(),
+		day = date.getDay(),
+		hours = date.getHours(),
+		minutes = date.getMinutes(),
+		seconds = date.getSeconds();
+	return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`
 }
 
-function writeDump(dump) {
+function generateDumpName(dump) {
+	let date = dump.issued.on;
+	return `dump_${dump.channel.type}${dump.channel.id}_${generateDateFileName(date)}.json`
+}
+
+function writeDump(dump, subDir = '') {
 	let name = generateDumpName(dump);
-	let path = DUMP_DIRECTORY + name;
+	let fullDirPath = DUMP_DIRECTORY + '/' + subDir;
+	let path = fullDirPath + '/' + name;
 	common.info('New dump created at \'' + path + '\'!');
-	common.mkDirByPathSync(DUMP_DIRECTORY, {isRelativeToScript: true});
-	common.saveFile(path, dump.content);
+	fs.mkdirSync(fullDirPath, {recursive: true});
+	common.saveFile(path, dump);
 }
 
 function logTimeTaken(ms) {
