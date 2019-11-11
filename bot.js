@@ -41,11 +41,14 @@ client.on('ready', () => {
 		setUpServer(guild[1]);
 	}
 
+	// WATER SETUP
 	common.loadWaterTimers();
-	common.debug(waterTimers);
-	common.debug(runningTimers);
 	common.startAllWaterTimers();
-	common.debug(runningTimers);
+
+	// REMINDER SETUP
+	common.loadReminders();
+	common.filterReminders();
+	common.startAllReminders();
 
 	saveData();
 
@@ -162,6 +165,37 @@ client.on('messageUpdate', (oldMessage, newMessage) => {
 	Edited.push(combinedEntry);
 	saveEdited();
 });
+
+function getReminderFromMessage(msg) {
+	let reminders = common.getReminders();
+	for (let reminderEntry of reminders) {
+		let reminder = reminderEntry[1];
+		if (msg.id === reminder.botMsg) return reminder;
+	}
+	return undefined;
+}
+
+// REACTION ADDED TO MESSAGE
+client.on('messageReactionAdd', (messageReaction, user) => {
+	let message = messageReaction.message;
+	// Only handle reactions on the bot's messages
+	if (message.author !== client.user) return false;
+
+	if (messageReaction.emoji.name === '🙋') {
+		if (!user.bot) common.joinReminder(user, getReminderFromMessage(message).id);
+	}
+});
+
+// REACTION REMOVED FROM MESSAGE
+client.on('messageReactionRemove', ((messageReaction, user) => {
+	let message = messageReaction.message;
+	// Only handle reactions on the bot's messages
+	if (message.author !== client.user) return false;
+
+	if (messageReaction.emoji.name === '🙋') {
+		if (!user.bot) common.leaveReminder(user, getReminderFromMessage(message).id);
+	}
+}));
 
 // ADDED TO SERVER
 client.on('guildCreate', guild => {

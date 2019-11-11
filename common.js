@@ -14,6 +14,14 @@ const EDITED_PATH = './edited_messages.json';
 let waterTimers = {};
 let runningWaterTimers = {};
 
+let reminders = new Discord.Collection();
+let runningReminders = new Discord.Collection();
+
+/*runningReminders['reminderId'] = {
+	timer : setTimeout(),
+	users : [],
+};*/
+
 // DATA VARS
 let Config = {};
 let Storage = {};
@@ -89,7 +97,9 @@ module.exports = {
 	getHelpRow, getCommandHelp, getFullHelpEmbed,
 	waterTimers, runningWaterTimers,
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
-	getBooleanValue, getUsers
+	reminders, runningReminders, getReminders, getRemindersOfUser,
+	addReminder, loadReminders, startReminder, startAllReminders, filterReminders, leaveAllReminders, joinReminder, leaveReminder,
+	getMessageLink, getBooleanValue, getUsers
 };
 
 //// METHODS
@@ -344,6 +354,102 @@ function getWaterTimerStatus(user) {
 	return diff;
 }
 
+function getMessageLink(msg) {
+	return 'http://discordapp.com/channels/' + ((msg.channel.type === 'text') ? msg.guild.id : '@me') + '/' + msg.channel.id + '/' + msg.id;
+}
+
+function addReminder(msg, date, task, botMsg) {
+	let msgLink = getMessageLink(msg);
+	let id = Discord.SnowflakeUtil.generate();
+	let reminder = {
+		id : id,
+		'users' : [
+			msg.author.id
+		],
+		'userMsg' : msg.id,
+		'botMsg' : botMsg.id,
+		'date' : date,
+		'msgLink' : msgLink,
+		'task' : task
+	};
+	reminders.set(id, reminder);
+	Storage.reminders = Array.from(reminders);
+	saveData();
+	debug('Added reminder with id ' + id + ':');
+	debug(reminder);
+	startReminder(id);
+}
+
+function loadReminders() {
+	reminders = new Discord.Collection(Storage.reminders);
+	debug('Loaded all reminders.');
+}
+
+async function notifyOldReminders(collection) {
+	let usersWithOldReminders = getUsersWithReminders(collection);
+	for (const userEntry of usersWithOldReminders) {
+		let user = userEntry[1];
+		let oldReminders = getRemindersOfUser(user, collection);
+		let tempText = 'I couldn\'t remind you of these tasks:\n';
+		for (const reminderEntry of oldReminders) {
+			let reminder = reminderEntry[1];
+			tempText += '[' + parseDate(reminder.date);
+			if (reminder.task != null) {
+				tempText += ' - ' + reminder.task;
+			}
+			tempText += '](<' + reminder.msgLink + '>)';
+			if (reminder !== oldReminders.last()) {
+				tempText += '\n';
+			}
+		}
+		let embed = new Discord.RichEmbed()
+			.setColor(0XAE0028)
+			.setTitle('Sorry!')
+			.setDescription(tempText);
+		let channel = await getDmChannel(user);
+		channel.send({ embed: embed });
+	}
+}
+
+function filterReminders() {
+	let now = new Date();
+	let amt = 0;
+	let filtered = reminders.filter(reminder => {
+		return (new Date(reminder.date) <= now);
+	});
+	reminders = reminders.filter(reminder => {
+		let bool = (new Date(reminder.date) > now);
+		if (bool) amt++;
+		return bool;
+	});
+	debug(`Removed ${amt} outdated reminders.`);
+	notifyOldReminders(filtered);
+	saveReminders();
+}
+
+function getReminders() {
+	return reminders;
+}
+
+function getUsersWithReminders(collection = reminders) {
+	let users = new Discord.Collection();
+	collection.forEach(reminder => {
+		for (let i = 0; i < reminder.users.length; i++) {
+			let userEntry = reminder.users[i];
+			let user = client.users.get(userEntry);
+			if (!users.has(userEntry)) {
+				users.set(userEntry, user);
+			}
+		}
+	});
+	return users;
+}
+
+function getRemindersOfUser(user, collection = reminders) {
+	return collection.filter(value => {
+		return value.users.includes(user.id);
+	});
+}
 
 function simplifyCollection(collection) {
 	let simple = new Discord.Collection();
@@ -354,6 +460,90 @@ function simplifyCollection(collection) {
 	});
 	return simple;
 }
+
+async function sendReminder(id, user) {
+	let reminder = reminders.get(id);
+	let msgLink = reminder.msgLink;
+	let task = reminder.task;
+	let userAmt = reminder.users.length - 1;
+	let embed = new Discord.RichEmbed()
+		.setColor(0x00AE86)
+		.setTitle('Reminder!')
+		.setDescription('I\'m here to remind you about [this message](<' + msgLink + '>).\nThe task was:\n> ' + task);
+	if (userAmt > 0) embed.setFooter(userAmt + ' other ' + (userAmt === 1 ? 'person' : 'people') + ' also got this reminder!');
+	let channel = await getDmChannel(user);
+	channel.send({ embed: embed });
+}
+
+function triggerReminder(id) {
+	let reminder = reminders.get(id);
+	let users = reminder.users;
+	for (let userEntry of users) {
+		let user = client.users.get(userEntry);
+		sendReminder(id, user);
+		reminders.delete(id);
+		saveReminders();
+	}
+	debug('Triggered reminder with id ' + id + '.');
+}
+
+function startReminder(id) {
+	let reminder = reminders.get(id);
+	let now = new Date();
+	let future = new Date(reminder.date);
+	let timeDiff = future - now;
+	console.log(timeDiff);
+	if (timeDiff < 0 ) return false; //TODO reminder is in past handling
+	let timer = setTimeout(function() {
+		triggerReminder(id);
+	}, timeDiff);
+	runningReminders.set(id, {
+		timer : timer,
+		started : now
+	});
+	debug('Started reminder with id ' + id + '.');
+}
+
+function startAllReminders() {
+	reminders.forEach((value, key) => {
+		startReminder(key);
+	});
+	debug('Started all reminder timers.');
+}
+
+function joinReminder(user, id) {
+	let reminder = reminders.get(id);
+	if (!reminder.users.includes(user.id)) reminder.users.push(user.id);
+	saveReminders();
+	console.log(user + ' joined reminder');
+	console.log(reminder);
+}
+
+function leaveReminder(user, id) {
+	let reminder = reminders.get(id);
+	if (reminder.users.includes(user.id)) reminder.users = reminder.users.filter(value => {
+		return value !== user.id;
+	});
+	saveReminders();
+	console.log(user + ' left reminder');
+	console.log(reminder);
+}
+
+function leaveAllReminders(user) {
+	let userReminders = getRemindersOfUser(user);
+	for (let reminderEntry of userReminders) {
+		let reminder = reminderEntry[1];
+		if (reminder.users.includes(user.id)) leaveReminder(user, reminder.id);
+	}
+	saveReminders();
+}
+
+function saveReminders() {
+	Storage.reminders = Array.from(reminders);
+	saveData();
+	debug('Saved reminders.');
+}
+
 async function getDmChannel(user) {
 	if (user.bot) return undefined;
 	if (user.dmChannel != null) return user.dmChannel;

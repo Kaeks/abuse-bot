@@ -1,7 +1,9 @@
 const common = require('../common.js');
 const {
 	Storage,
-	saveData
+	saveData,
+	addReminder, leaveReminder, leaveAllReminders,
+	getMessageLink
 } = common;
 const Discord = require('discord.js');
 
@@ -18,21 +20,24 @@ module.exports = {
 				let regexString = suffix.match(/(.*)(?:-m (.*))/i);
 				common.debug(regexString);
 				let date = Date.parse(regexString[1]);
+				if (date == null) { // this is right but linter says no
+					msg.channel.send('Invalid time/date input!').then(message => message.delete(3000));
+					return false;
+				}
 				let task = regexString[2];
-				let msgLink = 'http://discordapp.com/channels/' + ((msg.channel.type === 'text') ? msg.guild.id : '@me') + '/' + msg.channel.id + '/' + msg.id;
-				Storage.reminders.push({
-					'user' : msg.author.id,
-					'date' : date,
-					'msgLink' : msgLink,
-					'task' : task
-				});
-				common.debug(Storage.reminders);
-				saveData();
+				let msgLink = getMessageLink(msg);
 				let embed = new Discord.RichEmbed()
+					.setColor(0x00AE86)
 					.setTitle('Reminder set!')
-					.setDescription('I will remind you about [this message](<' + msgLink + '>) on ' + date + '.')
-					.setFooter('I actually won\'t because my owner is too lazy to implement that right now.');
-				msg.channel.send({embed});
+					.setDescription('I will remind you about [this message](<' + msgLink + '>) on ' + date + '.');
+				if (msg.channel.type !== 'dm') {
+					embed.setFooter('React to this message with 🙋 if you would also like to be reminded');
+				}
+				let messagePromise = msg.channel.send({ embed: embed });
+				messagePromise.then(botMsg => addReminder(msg, date, task, botMsg));
+				if (msg.channel.type !== 'dm') {
+					messagePromise.then(message => message.react('🙋'));
+				}
 			}
 		},
 		{
@@ -45,20 +50,35 @@ module.exports = {
 					usage : '',
 					description : 'Remove all of your reminders.',
 					execute(msg) {
-						for (let i = 0; i < Storage.reminders.length; i++) {
-							if (Storage.reminders[i].user === msg.author.id) {
-								Storage.reminders[i] = null;
-							}
-						}
-						saveData();
+						leaveAllReminders(msg.author);
 					}
 				},
 			],
 			usage : '<#>',
-			description : 'Remove the reminder with list #<#>.'/*,
+			description : 'Remove the reminder with list #<#>.',
 			execute(msg, suffix) {
-				let toRemove = suffix.split(' ')[1];
-			}*/
+				if (!isNaN(suffix)) {
+					if (parseInt(suffix, 10) >= 0 ) {
+						let reminderIndex = parseInt(suffix, 10);
+						let simpleReminders = common.simplifyCollection(common.getReminders());
+						console.log(simpleReminders);
+						let reminder;
+						if (simpleReminders.has(reminderIndex)) {
+							reminder = simpleReminders.get(reminderIndex);
+							leaveReminder(msg.author, reminder.id);
+						} else {
+							msg.channel.send('You don\'t have a reminder #' + reminderIndex + '.');
+							return false;
+						}
+					} else {
+						msg.channel.send('<#> must be 0 or greater.');
+						return false;
+					}
+				} else {
+					msg.channel.send('<#> must be an integer.');
+					return false;
+				}
+			}
 		},
 		{
 			name : 'list',
@@ -66,26 +86,20 @@ module.exports = {
 			usage : '',
 			description : 'List all reminders',
 			execute(msg) {
-				let tempReminders = [];
-				for (let i = 0; i < Storage.reminders.length; i++) {
-					if (Storage.reminders[i].user === msg.author.id) {
-						tempReminders.push(Storage.reminders[i]);
-					}
-				}
+				let simpleReminders = common.simplifyCollection(common.getRemindersOfUser(msg.author));
 				let tempText = '';
-				for (let i = 0; i < tempReminders.length; i++) {
-					let cur = tempReminders[i];
-					tempText += '**#' + (i + 1) + '** ' + common.parseDate(cur.date);
-					if (cur.task != null) {
-						tempText += ' - ' + cur.task;
+				simpleReminders.forEach((reminder, index) => {
+					tempText += '**#' + (index) + '** ' + common.parseDate(reminder.date);
+					if (reminder.task != null) {
+						tempText += ' - ' + reminder.task;
 					}
-					if (i < tempReminders.length) {
+					if (index !== simpleReminders.lastKey()) {
 						tempText += '\n';
 					}
-				}
+				});
 				let embed = new Discord.RichEmbed()
 					.setDescription('Here are your reminders, ' + msg.author + '!\n' + tempText);
-				msg.channel.send({embed});
+				msg.channel.send({ embed: embed });
 			}
 		}
 	]
