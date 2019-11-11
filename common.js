@@ -390,7 +390,7 @@ async function notifyOldReminders(collection) {
 	for (const userEntry of usersWithOldReminders) {
 		let user = userEntry[1];
 		let oldReminders = getRemindersOfUser(user, collection);
-		let tempText = 'I couldn\'t remind you of these tasks:\n';
+		let tempText = 'I wasn\'t able to remind you of these messages:\n';
 		for (const reminderEntry of oldReminders) {
 			let reminder = reminderEntry[1];
 			tempText += '[' + parseDate(reminder.date);
@@ -466,10 +466,12 @@ async function sendReminder(id, user) {
 	let msgLink = reminder.msgLink;
 	let task = reminder.task;
 	let userAmt = reminder.users.length - 1;
+	let tempText = 'I\'m here to remind you about [this message](<' + msgLink + '>).';
+	if (task != null) tempText += '\nThe task was:\n> ' + task;
 	let embed = new Discord.RichEmbed()
 		.setColor(0x00AE86)
 		.setTitle('Reminder!')
-		.setDescription('I\'m here to remind you about [this message](<' + msgLink + '>).\nThe task was:\n> ' + task);
+		.setDescription(tempText);
 	if (userAmt > 0) embed.setFooter(userAmt + ' other ' + (userAmt === 1 ? 'person' : 'people') + ' also got this reminder!');
 	let channel = await getDmChannel(user);
 	channel.send({ embed: embed });
@@ -487,13 +489,22 @@ function triggerReminder(id) {
 	debug('Triggered reminder with id ' + id + '.');
 }
 
+function deleteReminder(id) {
+	reminders.delete(id);
+	saveReminders();
+	debug('Deleted reminder with id ' + id + '.');
+}
+
 function startReminder(id) {
 	let reminder = reminders.get(id);
 	let now = new Date();
 	let future = new Date(reminder.date);
 	let timeDiff = future - now;
 	console.log(timeDiff);
-	if (timeDiff < 0 ) return false; //TODO reminder is in past handling
+	if (timeDiff < 0 ) {
+		deleteReminder(id);
+		return false;
+	}
 	let timer = setTimeout(function() {
 		triggerReminder(id);
 	}, timeDiff);
@@ -560,4 +571,8 @@ function getBooleanValue(suffix) {
 	return newVal
 }
 
-function getUsers() {return client.users.filter(user => {return user.bot === false})}
+function getUsers() {
+	return client.users.filter(user => {
+		return user.bot === false
+	});
+}

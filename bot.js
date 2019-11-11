@@ -54,17 +54,20 @@ client.on('ready', () => {
 
 });
 
+const notToDelete = [ 'reminder' ];
+
 // MESSAGE
 client.on('message', msg => {
 	if (msg.author.id === client.user.id) return false;
 	if (isCommand(msg)) {
 		handleCommand(msg);
-		if (msg.channel.type !== 'dm' && msg.channel.type !== 'group') {
-			if (msg.guild.me.permissions.has('MANAGE_MESSAGES')) {
+		if (msg.channel.type === 'dm' || msg.channel.type === 'group') return false;
+		if (msg.guild.me.permissions.has('MANAGE_MESSAGES')) {
+			if (!notToDelete.includes(getCommandName(msg))) {
 				setTimeout(function() {
 					msg.delete().catch(console.error);
 				}, 3000);
-			}
+			}		
 		}
 	} else {
 		// Message is not a command
@@ -367,6 +370,15 @@ function isCommand(msg) {
 	const split = msg.content.slice(Config.prefix.length).split(/ +/);
 	const commandName = split[0].toLowerCase();
 	return client.commands.has(commandName);
+}
+
+/**
+ * Get the name of the command in the message.
+ * @param {*} msg 
+ */
+function getCommandName(msg) {
+	const split = msg.content.slice(Config.prefix.length).split(/ +/);
+	return split[0].toLowerCase();
 }
 
 /**

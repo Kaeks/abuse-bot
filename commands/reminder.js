@@ -16,25 +16,40 @@ module.exports = {
 			args : common.argumentValues.REQUIRED,
 			usage : '<time/date> [-m <message]',
 			description : 'Add a reminder that will remind you until either <time> has passed or remind you on <date>. Optional message after token [-m].',
-			execute(msg, suffix) {
-				let regexString = suffix.match(/(.*)(?:-m (.*))/i);
-				common.debug(regexString);
-				let date = Date.parse(regexString[1]);
+			execute(msg, suffix) {				
+				let optionString = ' -m'
+				let mPosition = suffix.indexOf(optionString);
+
+				console.log(mPosition);
+
+				let dateString = mPosition > -1 ? suffix.substring(0, mPosition) : suffix;
+				let taskString = mPosition > -1 ? suffix.substring(mPosition + 1 + optionString.length) : undefined;
+
+				console.log(dateString);
+				console.log(taskString);
+
+				if (mPosition > -1 && taskString.length === 0) {
+					msg.channel.send('Missing task after `-m` option.');
+					return false;
+				}
+				
+				let date = Date.parse(dateString);
 				if (date == null) { // this is right but linter says no
 					msg.channel.send('Invalid time/date input!').then(message => message.delete(3000));
 					return false;
 				}
-				let task = regexString[2];
 				let msgLink = getMessageLink(msg);
+				let tempText = 'I will remind you about [this message](<' + msgLink + '>) on ' + date + '.' +
+				(taskString !== undefined ? '\n> ' + taskString : '');
 				let embed = new Discord.RichEmbed()
 					.setColor(0x00AE86)
 					.setTitle('Reminder set!')
-					.setDescription('I will remind you about [this message](<' + msgLink + '>) on ' + date + '.');
+					.setDescription(tempText);
 				if (msg.channel.type !== 'dm') {
 					embed.setFooter('React to this message with 🙋 if you would also like to be reminded');
 				}
 				let messagePromise = msg.channel.send({ embed: embed });
-				messagePromise.then(botMsg => addReminder(msg, date, task, botMsg));
+				messagePromise.then(botMsg => addReminder(msg, date, taskString, botMsg));
 				if (msg.channel.type !== 'dm') {
 					messagePromise.then(message => message.react('🙋'));
 				}
