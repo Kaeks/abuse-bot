@@ -4,7 +4,7 @@ const {
 	Config, Storage, Blocked, Deleted, Edited,
 	loadFile, saveFile,
 	saveData, saveBlocked, saveDeleted, saveEdited, saveConfig,
-	waterTimers, runningTimers,
+	waterTimers, runningWaterTimers,
 	sendWednesday
 } = common;
 const Discord = require('discord.js');

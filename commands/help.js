@@ -23,7 +23,7 @@ module.exports = {
 			common.getFullHelpEmbed(msg, embed);
 			let user = msg.author;
 			let channel = await common.getDmChannel(user);
-			channel.send({embed});
+			channel.send({ embed: embed });
 		} else {
 			const commandName = suffix.split(' ')[0].toLowerCase();
 			common.debug('commandName: ' + commandName);
@@ -31,7 +31,7 @@ module.exports = {
 			const command = commands.get(commandName);
 			embed.setTitle('Help for ' + Config.prefix + commandName)
 				.setDescription(common.getCommandHelp(command));
-			msg.channel.send({embed});
+			msg.channel.send({ embed: embed });
 		}
 	}
 };

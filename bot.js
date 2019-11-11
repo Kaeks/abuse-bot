@@ -15,7 +15,7 @@ const {
 	fs,
 	Config, Storage, Blocked, Deleted, Edited,
 	saveData, saveBlocked, saveDeleted, saveEdited,
-	waterTimers, runningTimers,
+	waterTimers, runningWaterTimers,
 	updatePresence,
 	sendWednesday
 } = common;
@@ -54,7 +54,8 @@ client.on('ready', () => {
 // MESSAGE
 client.on('message', msg => {
 	if (msg.author.id === client.user.id) return false;
-	if (checkMessageForCommand(msg)) {
+	if (isCommand(msg)) {
+		handleCommand(msg);
 		if (msg.channel.type !== 'dm' && msg.channel.type !== 'group') {
 			if (msg.guild.me.permissions.has('MANAGE_MESSAGES')) {
 				setTimeout(function() {
@@ -95,10 +96,11 @@ client.on('message', msg => {
 
 // MESSAGE DELETED
 client.on('messageDelete', message => {
-	if (message.author.bot) {
-		// discard messages created by bots
-		return false;
-	}
+	// Discard messages created by bots
+	if (message.author.bot) return false;
+	// Discard messages that were commands (and thus deleted by the bot)
+	if (isCommand(message)) return false;
+
 	common.log('Message by ' + message.author + ' deleted.');
 	let shortened = {
 		id: message.id,
@@ -202,6 +204,10 @@ function getTimeZone(user) {
 	return Storage.users[user.id].timeZone;
 }
 
+/**
+ * Sets up database space for a server
+ * @param server
+ */
 function setUpServer(server) {
 	if (!Storage.servers.hasOwnProperty(server.id)) {
 		common.log('Added \'' + server.name + '\' to server list.');
@@ -212,6 +218,10 @@ function setUpServer(server) {
 	saveData();
 }
 
+/**
+ * Sets up database space for a user
+ * @param user
+ */
 function setUpUser(user) {
 	if (!Storage.users.hasOwnProperty(user.id)) {
 		common.log('Added \'' + user + '\' to user list.');
@@ -224,6 +234,14 @@ function setUpUser(user) {
 }
 
 //// COMMAND HANDLING
+/**
+ * Recursive function to execute a command - sub-command chain
+ * @param msg
+ * @param suffix
+ * @param command
+ * @param commandChain
+ * @returns {boolean} success
+ */
 function findSubCommand(msg, suffix, command, commandChain = []) {
 	let localCommandChain = commandChain.slice();
 	localCommandChain.push(command);
@@ -287,28 +305,55 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 			.setColor('00AE86')
 			.setTitle('Help for ' + commandString)
 			.setDescription(common.getCommandHelp(command, commandChain));
-		msg.channel.send({embed});
+		msg.channel.send({ embed: embed });
 	}
 	return false;
 }
 
-function checkMessageForCommand(msg) {
-	// Check whether the message was issued by another user
-	if (!msg.content.startsWith(Config.prefix)) return false;
-	if (!Storage.users.hasOwnProperty(msg.author.id)) setUpUser(msg.author);
+/**
+ * Returns whether or not a user is blocked from using bot features.
+ * @param user
+ * @returns {boolean}
+ */
+function isBlocked(user) {
+	return Blocked.includes(user.id);
+}
 
+/**
+ * Returns whether or not a message is to be handled as a command by the bot.
+ * @param msg
+ * @returns {boolean} success
+ */
+function isCommand(msg) {
+	// Check whether the message was issued by another user
+	if (msg.author === client.user) return false;
+	// Check whether the message starts with the bot's prefix
+	if (!msg.content.startsWith(Config.prefix)) return false;
+
+	const split = msg.content.slice(Config.prefix.length).split(/ +/);
+	const commandName = split[0].toLowerCase();
+	return client.commands.has(commandName);
+}
+
+/**
+ * Handles a command inside a message
+ * @param msg
+ * @returns {boolean} success
+ */
+function handleCommand(msg) {
 	// Filter out blocked users
-	if (Blocked.includes(msg.author.id)) {
+	if (isBlocked(msg.author)) {
 		common.debug('User is on blocked user list');
 		msg.channel.send('I\'m sorry, ' + msg.author + ', you\'ve been blocked from using me.');
 		return false;
 	}
 
+	// Create database space for the message author
+	if (!Storage.users.hasOwnProperty(msg.author.id)) setUpUser(msg.author);
+
 	const split = msg.content.slice(Config.prefix.length).split(/ +/);
 	const commandName = split[0].toLowerCase();
 	common.debug('commandName: ' + commandName);
-
-	if (!client.commands.has(commandName)) return false;
 	const command = client.commands.get(commandName);
 
 	let temp = msg.content.substring(Config.prefix.length + commandName.length);
@@ -316,7 +361,6 @@ function checkMessageForCommand(msg) {
 
 	const suffix = match !== null ? temp.substring(match[0].length) : null;
 	common.debug('suffix: ' + suffix);
-
 	try {
 		findSubCommand(msg, suffix, command);
 		return true;

@@ -2,7 +2,7 @@ const common = require('../common.js');
 const {
 	Config, Storage,
 	saveData,
-	waterTimers, runningTimers,
+	waterTimers, runningWaterTimers,
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus
 } = common;
 const Discord = require('discord.js');
@@ -94,10 +94,10 @@ module.exports = {
 								saveData();
 								msg.channel.send('Water interval has been set to ' + newInterval + ' minutes.');
 								common.debug(waterTimers);
-								common.debug(runningTimers);
+								common.debug(runningWaterTimers);
 								updateWaterTimer(user);
 								common.debug(waterTimers);
-								common.debug(runningTimers);
+								common.debug(runningWaterTimers);
 							} else {
 								msg.channel.send('<interval> must be above 0.');
 							}

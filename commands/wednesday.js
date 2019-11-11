@@ -153,7 +153,7 @@ module.exports = {
 			.setTitle('It is Wednesday, my dudes.')
 			.setColor(0x00AE86)
 			.setImage('https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg');
-		msg.channel.send({embed});
+		msg.channel.send({ embed: embed });
 	}
 };
 

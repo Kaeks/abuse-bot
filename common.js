@@ -12,7 +12,7 @@ const EDITED_PATH = './edited_messages.json';
 
 // SHARED VARS
 let waterTimers = {};
-let runningTimers = {};
+let runningWaterTimers = {};
 
 // DATA VARS
 let Config = {};
@@ -80,13 +80,14 @@ module.exports = {
 	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited,
 	argumentValues,
 	debug, log, info, warn,
+	simplifyCollection,
 	getDmChannel,
 	updatePresence,
 	parseDate,
 	sendWednesday,
 	combineCommandChain,
 	getHelpRow, getCommandHelp, getFullHelpEmbed,
-	waterTimers, runningTimers,
+	waterTimers, runningWaterTimers,
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
 	getBooleanValue, getUsers
 };
@@ -147,9 +148,8 @@ function saveEdited() 	{saveFile(EDITED_PATH, 	Edited);	}
 
 // HELPERS
 function updatePresence(status = 'online', name = Config.prefix + 'help', type = 'LISTENING', url = 'https://www.github.com/Kaeks/wiktor-bot') {
-	client.user.setStatus(status)
-		.catch(console.error);
 	client.user.setPresence({
+		status: status,
 		game : {
 			name : name,
 			type : type,
@@ -263,12 +263,12 @@ function sendWednesday(channel) {
 		.setTitle('It is Wednesday, my dudes.')
 		.setColor(0x00AE86)
 		.setImage('https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg');
-	channel.send({embed});
+	channel.send({ embed: embed });
 }
 
 // WATER
 async function sendWater(user) {
-	runningTimers[user.id].started = new Date();
+	runningWaterTimers[user.id].started = new Date();
 	if (user.presence.status === 'offline' || (user.presence.status === 'dnd' && Storage.users[user.id].water.ignoreDnD !== true)) {
 		return false;
 	}
@@ -277,7 +277,7 @@ async function sendWater(user) {
 		.setDescription('Drink some water **now**.')
 		.setThumbnail('https://media.istockphoto.com/photos/splash-fresh-drop-in-water-close-up-picture-id801948192');
 	let channel = await getDmChannel(user);
-	channel.send({embed});
+	channel.send({ embed: embed });
 }
 
 function addWaterTimer(user) {
@@ -285,14 +285,15 @@ function addWaterTimer(user) {
 }
 
 function loadWaterTimers() {
-	for (let userId in Storage.users) {
-		if (!Storage.users.hasOwnProperty(userId)) continue;
-		if (!Storage.users[userId].hasOwnProperty('water')) continue;
-		if (Storage.users[userId].water.enabled === true) {
-			let user = client.users.get(userId);
+	for (let userEntry in Storage.users) {
+		if (!Storage.users.hasOwnProperty(userEntry)) continue;
+		if (!Storage.users[userEntry].hasOwnProperty('water')) continue;
+		if (Storage.users[userEntry].water.enabled === true) {
+			let user = client.users.get(userEntry);
 			addWaterTimer(user);
 		}
 	}
+	debug('Loaded all water timers.');
 }
 
 function startWaterTimer(user) {
@@ -300,11 +301,12 @@ function startWaterTimer(user) {
 	let timer = setInterval(function() {
 		sendWater(user);
 	}, waterTimers[user.id]  * 60 * 1000);
-	if (runningTimers[user.id] === undefined) {
-		runningTimers[user.id] = {};
-	}
-	runningTimers[user.id].timer = timer;
-	runningTimers[user.id].started = now;
+
+	runningWaterTimers[user.id] = {
+		timer : timer,
+		started : now
+	};
+
 	debug('Started water timer for ' + user.username + '#' + user.discriminator);
 }
 
@@ -314,14 +316,15 @@ function startAllWaterTimers() {
 		let user = client.users.get(userEntry);
 		startWaterTimer(user);
 	}
+	debug('Started all water timers.');
 }
 
 function stopWaterTimer(user) {
-	if (runningTimers[user.id] === undefined) {
+	if (runningWaterTimers[user.id] === undefined) {
 		return false;
 	}
-	clearInterval(runningTimers[user.id].timer);
-	runningTimers[user.id] = undefined;
+	clearInterval(runningWaterTimers[user.id].timer);
+	runningWaterTimers[user.id] = undefined;
 }
 
 function updateWaterTimer(user) {
@@ -333,7 +336,7 @@ function updateWaterTimer(user) {
 function getWaterTimerStatus(user) {
 	let now = new Date();
 	debug(now);
-	let started = runningTimers[user.id].started;
+	let started = runningWaterTimers[user.id].started;
 	let future = new Date(started.getTime() + waterTimers[user.id] * 60 * 1000);
 	debug(future);
 	let diff = future - now;
@@ -341,6 +344,16 @@ function getWaterTimerStatus(user) {
 	return diff;
 }
 
+
+function simplifyCollection(collection) {
+	let simple = new Discord.Collection();
+	let counter = 0;
+	collection.forEach(value => {
+		simple.set(counter, value);
+		counter++;
+	});
+	return simple;
+}
 async function getDmChannel(user) {
 	if (user.bot) return undefined;
 	if (user.dmChannel != null) return user.dmChannel;

@@ -20,7 +20,7 @@ module.exports = {
 					'filters:focal(0x0:2282x1712)/' +
 					'cdn.vox-cdn.com/uploads/chorus_image/image/50821489/spam-wall.0.0.jpg')
 				.setFooter(msg.author.username + ' has sent you some SPAM.');
-			msg.mentions.users.first().send({embed});
+			msg.mentions.users.first().send({ embed: embed });
 		}
 	}
 };
