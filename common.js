@@ -477,15 +477,15 @@ async function sendReminder(id, user) {
 	channel.send({ embed: embed });
 }
 
-function triggerReminder(id) {
+async function triggerReminder(id) {
 	let reminder = reminders.get(id);
 	let users = reminder.users;
 	for (let userEntry of users) {
 		let user = client.users.get(userEntry);
-		sendReminder(id, user);
-		reminders.delete(id);
-		saveReminders();
+		await sendReminder(id, user);
 	}
+	reminders.delete(id);
+	saveReminders();
 	debug('Triggered reminder with id ' + id + '.');
 }
 
@@ -500,7 +500,6 @@ function startReminder(id) {
 	let now = new Date();
 	let future = new Date(reminder.date);
 	let timeDiff = future - now;
-	console.log(timeDiff);
 	if (timeDiff < 0 ) {
 		deleteReminder(id);
 		return false;
@@ -526,8 +525,7 @@ function joinReminder(user, id) {
 	let reminder = reminders.get(id);
 	if (!reminder.users.includes(user.id)) reminder.users.push(user.id);
 	saveReminders();
-	console.log(user + ' joined reminder');
-	console.log(reminder);
+	log(user + ' joined reminder ' + id + '.');
 }
 
 function leaveReminder(user, id) {
@@ -536,8 +534,7 @@ function leaveReminder(user, id) {
 		return value !== user.id;
 	});
 	saveReminders();
-	console.log(user + ' left reminder');
-	console.log(reminder);
+	log(user + ' left reminder ' + id + '.');
 }
 
 function leaveAllReminders(user) {

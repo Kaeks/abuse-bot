@@ -259,7 +259,7 @@ function setUpServer(server) {
  * Sets up database space for a user
  * @param user
  */
-function setUpUser(user) {
+function setUpUser(msg, user) {
 	if (!Storage.users.hasOwnProperty(user.id)) {
 		common.log('Added \'' + user + '\' to user list.');
 		Storage.users[user.id] = {};
@@ -267,6 +267,10 @@ function setUpUser(user) {
 	Storage.users[user.id].wednesday = Storage.users[user.id].wednesday || {};
 	Storage.users[user.id].water = Storage.users[user.id].water || {};
 	Storage.users[user.id].timeZone = Storage.users[user.id].timeZone || '+0100';
+	msg.channel.send(
+		`Hey, ${user}! This seems to be your first time interacting with me. ` +
+		`Make sure to enable DMs from users on this server to be able to receive personal messages used for a variety of my functions.`
+	);
 	saveData();
 }
 
@@ -395,7 +399,7 @@ function handleCommand(msg) {
 	}
 
 	// Create database space for the message author
-	if (!Storage.users.hasOwnProperty(msg.author.id)) setUpUser(msg.author);
+	if (!Storage.users.hasOwnProperty(msg.author.id)) setUpUser(msg, msg.author);
 
 	const split = msg.content.slice(Config.prefix.length).split(/ +/);
 	const commandName = split[0].toLowerCase();

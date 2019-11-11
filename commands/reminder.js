@@ -20,13 +20,13 @@ module.exports = {
 				let optionString = ' -m'
 				let mPosition = suffix.indexOf(optionString);
 
-				console.log(mPosition);
+				common.debug('mPosition: ' + mPosition);
 
 				let dateString = mPosition > -1 ? suffix.substring(0, mPosition) : suffix;
 				let taskString = mPosition > -1 ? suffix.substring(mPosition + 1 + optionString.length) : undefined;
 
-				console.log(dateString);
-				console.log(taskString);
+				common.debug('dateString: ' + dateString);
+				common.debug('taskString: ' + taskString);
 
 				if (mPosition > -1 && taskString.length === 0) {
 					msg.channel.send('Missing task after `-m` option.');
