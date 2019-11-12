@@ -1,6 +1,7 @@
 const common = require('../common.js');
-const { fs, Config } = common;
-const Discord = require('discord.js');
+const {
+	Discord, fs
+} = common;
 const DUMP_DIRECTORY = 'dumps';
 const DUMP_TYPE = {
 	ALL : 'all',
@@ -21,7 +22,7 @@ module.exports = {
 			async execute(msg) {
 				let channel = msg.channel;
 				let client = msg.client;
-				let messagesByBot = await getMessages(msg.client, channel, function(element) {
+				let messagesByBot = await getMessages(channel, function(element) {
 					return element.author.id === client.user.id;
 				});
 				console.info('Deleting ' + messagesByBot.size + ' of my messages.');
@@ -82,7 +83,7 @@ async function createDump(msg, suffix, type) {
 	let client = msg.client;
 	if (type === DUMP_TYPE.DM) {
 		let user = suffix == null ? msg.author : client.users.get(suffix);
-		let channel = await common.getDmChannel(user);
+		let channel = await user.getDmChannel();
 		let dump = await getChannelDump(msg, channel);
 		writeDump(dump, 'dm/' + user.id);
 	} else if (type === DUMP_TYPE.CHANNEL) {
@@ -113,7 +114,7 @@ async function createFullDump(msg) {
 	// -> Cache all available DM channels
 	for (let userEntry of users) {
 		let user = userEntry[1];
-		let dmChannel = await common.getDmChannel(user);
+		let dmChannel = await user.getDmChannel();
 		let dump = await getChannelDump(msg, dmChannel);
 		writeDump(dump, dumpDirectory + 'dm/' + user.id);
 		msgAmt += dump.messages.length;

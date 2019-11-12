@@ -1,5 +1,5 @@
 const common = require('../common.js');
-const Discord = require('discord.js');
+const { Discord } = common;
 
 module.exports = {
 	name : 'spam',

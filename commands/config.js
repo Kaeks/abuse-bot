@@ -1,13 +1,8 @@
 const common = require('../common.js');
 const {
-	fs,
-	Config, Storage, Blocked, Deleted, Edited,
-	loadFile, saveFile,
-	saveData, saveBlocked, saveDeleted, saveEdited, saveConfig,
-	waterTimers, runningWaterTimers,
-	sendWednesday
+	Discord,
+	Config, saveConfig,
 } = common;
-const Discord = require('discord.js');
 
 module.exports = {
 	name : 'config',

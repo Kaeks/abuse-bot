@@ -1,11 +1,8 @@
 const common = require('../common.js');
 const {
-	Storage,
-	saveData,
-	addReminder, leaveReminder, leaveAllReminders,
-	getMessageLink
+	Discord,
+	addReminder, leaveReminder, leaveAllReminders
 } = common;
-const Discord = require('discord.js');
 
 module.exports = {
 	name : 'reminder',
@@ -17,17 +14,18 @@ module.exports = {
 			usage : '<time/date> [-m <message]',
 			description : 'Add a reminder that will remind you until either <time> has passed or remind you on <date>. Optional message after token [-m].',
 			execute(msg, suffix) {				
-				let optionString = ' -m'
+				let optionString = ' -m';
 				let mPosition = suffix.indexOf(optionString);
 
 				common.debug('mPosition: ' + mPosition);
 
 				let dateString = mPosition > -1 ? suffix.substring(0, mPosition) : suffix;
-				let taskString = mPosition > -1 ? suffix.substring(mPosition + 1 + optionString.length) : undefined;
+				let taskString = mPosition > -1 ? suffix.substring(mPosition + 1 + optionString.length) : '';
 
 				common.debug('dateString: ' + dateString);
 				common.debug('taskString: ' + taskString);
 
+				// optionString has been found within the suffix, but nothing follows
 				if (mPosition > -1 && taskString.length === 0) {
 					msg.channel.send('Missing task after `-m` option.');
 					return false;
@@ -38,11 +36,11 @@ module.exports = {
 					msg.channel.send('Invalid time/date input!').then(message => message.delete(3000));
 					return false;
 				}
-				let msgLink = getMessageLink(msg);
+				let msgLink = msg.getLink();
 				let tempText = 'I will remind you about [this message](<' + msgLink + '>) on ' + date + '.' +
-				(taskString !== undefined ? '\n> ' + taskString : '');
+				(taskString.length > 0 ? '\n> ' + taskString : '');
 				let embed = new Discord.RichEmbed()
-					.setColor(0x00AE86)
+					.setColor(common.colors.GREEN)
 					.setTitle('Reminder set!')
 					.setDescription(tempText);
 				if (msg.channel.type !== 'dm') {
@@ -75,7 +73,7 @@ module.exports = {
 				if (!isNaN(suffix)) {
 					if (parseInt(suffix, 10) >= 0 ) {
 						let reminderIndex = parseInt(suffix, 10);
-						let simpleReminders = common.simplifyCollection(common.getReminders());
+						let simpleReminders = common.getReminders().simplify();
 						console.log(simpleReminders);
 						let reminder;
 						if (simpleReminders.has(reminderIndex)) {
@@ -101,11 +99,11 @@ module.exports = {
 			usage : '',
 			description : 'List all reminders',
 			execute(msg) {
-				let simpleReminders = common.simplifyCollection(common.getRemindersOfUser(msg.author));
+				let simpleReminders = common.getRemindersOfUser(msg.author).simplify();
 				let tempText = '';
 				simpleReminders.forEach((reminder, index) => {
 					tempText += '**#' + (index) + '** ' + common.parseDate(reminder.date);
-					if (reminder.task != null) {
+					if (reminder.task.length > 0) {
 						tempText += ' - ' + reminder.task;
 					}
 					if (index !== simpleReminders.lastKey()) {

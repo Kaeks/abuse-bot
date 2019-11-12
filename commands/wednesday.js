@@ -1,10 +1,9 @@
 const common = require('../common.js');
 const {
-	Storage,
-	saveData,
+	Discord,
+	Storage, saveData,
 	sendWednesday
 } = common;
-const Discord = require('discord.js');
 
 module.exports = {
 	name : 'wednesday',
@@ -124,7 +123,7 @@ module.exports = {
 				let user = msg.author;
 				if (msg.channel.type === 'dm' || msg.channel.type === 'group') {
 					if (isSubscribed(user)) {
-						sendWednesday(await common.getDmChannel(user));
+						sendWednesday(await user.getDmChannel());
 					} else {
 						msg.channel.send('You need to subscribe to the Wednesday frog service first.');
 					}
@@ -151,7 +150,7 @@ module.exports = {
 	execute(msg) {
 		let embed = new Discord.RichEmbed()
 			.setTitle('It is Wednesday, my dudes.')
-			.setColor(0x00AE86)
+			.setColor(common.colors.GREEN)
 			.setImage('https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg');
 		msg.channel.send({ embed: embed });
 	}

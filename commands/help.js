@@ -1,6 +1,5 @@
 const common = require('../common.js');
-const { Config } = common;
-const Discord = require('discord.js');
+const { Discord, Config } = common;
 
 module.exports = {
 	name : 'help',
@@ -16,13 +15,13 @@ module.exports = {
 	async execute(msg, suffix) {
 		const { commands } = msg.client;
 
-		let embed = new Discord.RichEmbed().setColor(0x00AE86);
+		let embed = new Discord.RichEmbed().setColor(common.colors.GREEN);
 
 		if (suffix == null) {
 			embed.setTitle('Help for all commands');
 			common.getFullHelpEmbed(msg, embed);
 			let user = msg.author;
-			let channel = await common.getDmChannel(user);
+			let channel = await user.getDmChannel();
 			channel.send({ embed: embed });
 		} else {
 			const commandName = suffix.split(' ')[0].toLowerCase();

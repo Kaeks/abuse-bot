@@ -1,7 +1,37 @@
 const fs = require('fs');
-const path = require('path');
-const Discord = require('discord.js');
-const { client } = require('./bot.js');
+const { Discord, client } = require('./bot.js');
+
+// AMENDS TO DISCORD.JS LIBRARY
+/**
+ * Returns the DM Channel of a user. Creates one if it does not exist.
+ * @returns {Promise<DMChannel|undefined>}
+ */
+Discord.User.prototype.getDmChannel = async function() {
+	if (this.bot) return undefined;
+	return this.dmChannel != null ? this.dmChannel : await this.createDM();
+};
+
+/**
+ * Returns the direct link to a message
+ * @returns {String}
+ */
+Discord.Message.prototype.getLink = function () {
+	return 'http://discordapp.com/channels/' + ((this.channel.type === 'text') ? this.guild.id : '@me') + '/' + this.channel.id + '/' + this.id;
+};
+
+/**
+ * Returns a simplified version of a collection that starts at 0 and iterates by adding 1 to each entry
+ * @returns {Discord.Collection<int, *>}
+ */
+Discord.Collection.prototype.simplify = function () {
+	let simple = new Discord.Collection();
+	let counter = 0;
+	this.forEach(value => {
+		simple.set(counter, value);
+		counter++;
+	});
+	return simple;
+};
 
 // CONSTANTS
 const CONFIG_PATH = './config.json';
@@ -53,25 +83,27 @@ saveFile(DELETED_PATH, Deleted);
 saveFile(EDITED_PATH, Edited);
 
 // ENUM
-/*
-	'args' property for commands:
-	NULL:		command doesn't have its own execute function
-				'' 		❌
-				'foo'	❌
-	NONE: 		arguments are NOT ACCEPTED
-				'' 		✔
-				'foo'	❌
-	OPTIONAL: 	arguments are OPTIONAL
-				'' 		✔
-				'foo'	✔
-	REQUIRED: 	arguments are REQUIRED
-				'' 		❌
-				'foo'	✔
-
-	⚠ THIS DOES NOT INCLUDE SUB-COMMANDS ⚠
-	* A command with only sub-commands but no standalone function is NONE
-	* A command with sub-commands and a standalone function can be OPTIONAL or REQUIRED,
-		 depending on whether the standalone function CAN or MUST receive an argument.
+/**
+ *	'args' property for commands:
+ *	NULL:		command doesn't have its own execute function
+ *				'' 		❌
+ *				'foo'	❌
+ *	NONE: 		arguments are NOT ACCEPTED
+ *				'' 		✔
+ *				'foo'	❌
+ *	OPTIONAL: 	arguments are OPTIONAL
+ *				'' 		✔
+ *				'foo'	✔
+ *	REQUIRED: 	arguments are REQUIRED
+ *				'' 		❌
+ *				'foo'	✔
+ *
+ *	⚠ THIS DOES NOT INCLUDE SUB-COMMANDS ⚠
+ *	* A command with only sub-commands but no standalone function is NONE
+ *	* A command with sub-commands and a standalone function can be OPTIONAL or REQUIRED,
+ *	  depending on whether the standalone function CAN or MUST receive an argument.
+ *
+ * @type {{OPTIONAL: number, NULL: number, REQUIRED: number, NONE: number}}
  */
 let argumentValues = {
 	NULL : -1,
@@ -80,16 +112,23 @@ let argumentValues = {
 	REQUIRED : 2
 };
 
+let colors = {
+	GREEN : 0x00AE86,
+	RED : 0xAE0028,
+	PURPLE : 0x8600AE,
+	BLURPLE : 0x7289DA,
+	PRESTIGE : 0xFBC100
+};
+
 //// EXPORTS
 module.exports = {
+	Discord,
 	fs, client,
 	Config, Storage, Blocked, Deleted, Edited,
 	loadFile, saveFile,
 	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited,
-	argumentValues,
+	argumentValues, colors,
 	debug, log, info, warn,
-	simplifyCollection,
-	getDmChannel,
 	updatePresence,
 	parseDate,
 	sendWednesday,
@@ -99,11 +138,15 @@ module.exports = {
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
 	reminders, runningReminders, getReminders, getRemindersOfUser,
 	addReminder, loadReminders, startReminder, startAllReminders, filterReminders, leaveAllReminders, joinReminder, leaveReminder,
-	getMessageLink, getBooleanValue, getUsers
+	getBooleanValue, getUsers
 };
 
 //// METHODS
 // CONSOLE
+/**
+ * Sends a message with the prefix [DEBUG] to the console in dark aqua if the 'debug' setting is active in config
+ * @param {*} msg
+ */
 function debug(msg) {
 	if (Config.debug) {
 		if (msg instanceof Object) {
@@ -115,6 +158,10 @@ function debug(msg) {
 	}
 }
 
+/**
+ * Sends a message with the prefix [LOG] to the console
+ * @param {*} msg
+ */
 function log(msg) {
 	if (msg instanceof Object) {
 		console.log('\x1b[2m%s\x1b[0m', '[LOG]');
@@ -124,27 +171,46 @@ function log(msg) {
 	}
 }
 
+/**
+ * Sends a message with the prefix [INFO] to the console in yellow
+ * @param {*} msg
+ */
 function info(msg) {
 	console.log('\x1b[33m%s\x1b[0m', `[INFO] ${msg}`);
 }
 
+/**
+ * Sends a message with the prefix [WARN] to the console in red
+ * @param {*} msg
+ */
 function warn(msg) {
 	console.log('\x1b[31m%s\x1b[0m', `[WARN] ${msg}`);
 }
 
 // FILESYSTEM
+/**
+ * Loads a file and creates it in case it does not exist
+ * @param {String} filePath
+ * @param {Object} variable
+ * @returns {*}
+ */
 function loadFile(filePath, variable) {
 	let temp;
 	try {
 		temp = require(filePath);
 		debug('Read ' + filePath);
 	} catch (e) {
-		fs.writeFileSync(filePath, JSON.stringify(variable, null, 2));
+		saveFile(filePath, variable);
 		info('Created ' + filePath);
 	}
 	return temp || variable;
 }
 
+/**
+ * Saves a file using a variable
+ * @param {String} filePath
+ * @param {Object} variable
+ */
 function saveFile(filePath, variable) {
 	fs.writeFileSync(filePath, JSON.stringify(variable, null, 2));
 }
@@ -157,7 +223,24 @@ function saveDeleted() 	{saveFile(DELETED_PATH, Deleted);	}
 function saveEdited() 	{saveFile(EDITED_PATH, 	Edited);	}
 
 // HELPERS
-function updatePresence(status = 'online', name = Config.prefix + 'help', type = 'LISTENING', url = 'https://www.github.com/Kaeks/wiktor-bot') {
+/**
+ * Enum for the game types a {Discord.Presence} can have
+ * @type {{WATCHING: number, LISTENING: number, STREAMING: number, PLAYING: number}}
+ */
+const gameTypes = {
+	PLAYING : 0,
+	STREAMING : 1,
+	LISTENING : 2,
+	WATCHING : 3
+};
+/**
+ * Updates the status and presence of the bot
+ * @param {String} status
+ * @param {String} name
+ * @param {Number} type
+ * @param {String} url
+ */
+function updatePresence(status = 'online', name = Config.prefix + 'help', type = gameTypes.LISTENING, url = 'https://www.github.com/Kaeks/wiktor-bot') {
 	client.user.setPresence({
 		status: status,
 		game : {
@@ -168,6 +251,11 @@ function updatePresence(status = 'online', name = Config.prefix + 'help', type =
 	}).catch(console.error);
 }
 
+/**
+ * Turns a date into a string with regard for how long the difference between now and the date is
+ * @param {Date} date
+ * @returns {String}
+ */
 function parseDate(date) {
 	let dateString;
 	if (Date.compare(Date.parse(date), (1).day().fromNow()) === 1) {
@@ -182,6 +270,11 @@ function parseDate(date) {
 	return dateString;
 }
 
+/**
+ * Returns a string of the combined commands and sub-commands inside a commandChain, separated by ' '
+ * @param {Array} commandChain
+ * @returns {String}
+ */
 function combineCommandChain(commandChain) {
 	let commandString = '';
 	for (let i = 0; i < commandChain.length; i++) {
@@ -193,10 +286,9 @@ function combineCommandChain(commandChain) {
 
 /**
  * Helper method for getting command help.
- *
- * @param commandString
- * @param usage
- * @param description
+ * @param {String} commandString
+ * @param {String} usage
+ * @param {String} description
  * @returns {string}
  */
 function getHelpRow(commandString, usage, description) {
@@ -206,10 +298,9 @@ function getHelpRow(commandString, usage, description) {
 
 /**
  * Returns a list of possible uses of a command as a string
- *
- * @param command
- * @param commandChain
- * @returns {string}
+ * @param {Object} command
+ * @param {Array} commandChain
+ * @returns {String}
  */
 function getCommandHelp(command, commandChain = []) {
 	let localCommandChain = commandChain.slice();
@@ -251,9 +342,8 @@ function getCommandHelp(command, commandChain = []) {
 
 /**
  * Returns an embed with *all* commands to the author of the message
- *
- * @param msg
- * @param embed
+ * @param {Message} msg
+ * @param {RichEmbed} embed
  */
 function getFullHelpEmbed(msg, embed) {
 	const { commands } = msg.client;
@@ -265,18 +355,22 @@ function getFullHelpEmbed(msg, embed) {
 // WEDNESDAY
 /**
  * Sends an image of the wednesday frog to the specified channel
- *
- * @param channel
+ * @param {Channel} channel
  */
 function sendWednesday(channel) {
 	let embed = new Discord.RichEmbed()
 		.setTitle('It is Wednesday, my dudes.')
-		.setColor(0x00AE86)
+		.setColor(colors.GREEN)
 		.setImage('https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg');
 	channel.send({ embed: embed });
 }
 
 // WATER
+/**
+ * Sends a water reminder to a user
+ * @param {User} user
+ * @returns {Promise<boolean>}
+ */
 async function sendWater(user) {
 	runningWaterTimers[user.id].started = new Date();
 	if (user.presence.status === 'offline' || (user.presence.status === 'dnd' && Storage.users[user.id].water.ignoreDnD !== true)) {
@@ -286,14 +380,21 @@ async function sendWater(user) {
 		.setTitle('Stay hydrated!')
 		.setDescription('Drink some water **now**.')
 		.setThumbnail('https://media.istockphoto.com/photos/splash-fresh-drop-in-water-close-up-picture-id801948192');
-	let channel = await getDmChannel(user);
+	let channel = await user.getDmChannel();
 	channel.send({ embed: embed });
 }
 
+/**
+ * Adds the water timer of a user to the list of cached water timers
+ * @param {User} user
+ */
 function addWaterTimer(user) {
 	waterTimers[user.id] = Storage.users[user.id].water.interval;
 }
 
+/**
+ * Loads all water timers to the list of cached water timers
+ */
 function loadWaterTimers() {
 	for (let userEntry in Storage.users) {
 		if (!Storage.users.hasOwnProperty(userEntry)) continue;
@@ -306,6 +407,10 @@ function loadWaterTimers() {
 	debug('Loaded all water timers.');
 }
 
+/**
+ * Starts the water timer of a user
+ * @param {User} user
+ */
 function startWaterTimer(user) {
 	let now = new Date();
 	let timer = setInterval(function() {
@@ -320,6 +425,9 @@ function startWaterTimer(user) {
 	debug('Started water timer for ' + user.username + '#' + user.discriminator);
 }
 
+/**
+ * Starts the water timers of all users
+ */
 function startAllWaterTimers() {
 	for (let userEntry in waterTimers) {
 		if (!waterTimers.hasOwnProperty(userEntry)) continue;
@@ -329,6 +437,11 @@ function startAllWaterTimers() {
 	debug('Started all water timers.');
 }
 
+/**
+ * Stops the water timer of a user
+ * @param {User} user
+ * @returns {boolean}
+ */
 function stopWaterTimer(user) {
 	if (runningWaterTimers[user.id] === undefined) {
 		return false;
@@ -337,12 +450,21 @@ function stopWaterTimer(user) {
 	runningWaterTimers[user.id] = undefined;
 }
 
+/**
+ * Updates the cached water timer of a user
+ * @param {User} user
+ */
 function updateWaterTimer(user) {
 	stopWaterTimer(user);
 	waterTimers[user.id] = Storage.users[user.id].water.interval;
 	startWaterTimer(user);
 }
 
+/**
+ * Gets the time (in ms) until the water timer of a user fires
+ * @param {User} user
+ * @returns {number}
+ */
 function getWaterTimerStatus(user) {
 	let now = new Date();
 	debug(now);
@@ -354,12 +476,16 @@ function getWaterTimerStatus(user) {
 	return diff;
 }
 
-function getMessageLink(msg) {
-	return 'http://discordapp.com/channels/' + ((msg.channel.type === 'text') ? msg.guild.id : '@me') + '/' + msg.channel.id + '/' + msg.id;
-}
-
+// REMINDERS
+/**
+ * Adds a new reminder
+ * @param {Message} msg
+ * @param {Date} date
+ * @param {String} task
+ * @param {Message} botMsg
+ */
 function addReminder(msg, date, task, botMsg) {
-	let msgLink = getMessageLink(msg);
+	let msgLink = msg.getLink();
 	let id = Discord.SnowflakeUtil.generate();
 	let reminder = {
 		id : id,
@@ -373,18 +499,25 @@ function addReminder(msg, date, task, botMsg) {
 		'task' : task
 	};
 	reminders.set(id, reminder);
-	Storage.reminders = Array.from(reminders);
-	saveData();
+	saveReminders();
 	debug('Added reminder with id ' + id + ':');
 	debug(reminder);
 	startReminder(id);
 }
 
+/**
+ * Loads all reminders into cache
+ */
 function loadReminders() {
 	reminders = new Discord.Collection(Storage.reminders);
 	debug('Loaded all reminders.');
 }
 
+/**
+ * Sends notifications for the expired reminders inside the collection
+ * @param {Collection<Discord.Snowflake, Object>}collection
+ * @returns {Promise<void>}
+ */
 async function notifyOldReminders(collection) {
 	let usersWithOldReminders = getUsersWithReminders(collection);
 	for (const userEntry of usersWithOldReminders) {
@@ -403,14 +536,17 @@ async function notifyOldReminders(collection) {
 			}
 		}
 		let embed = new Discord.RichEmbed()
-			.setColor(0XAE0028)
+			.setColor(colors.RED)
 			.setTitle('Sorry!')
 			.setDescription(tempText);
-		let channel = await getDmChannel(user);
+		let channel = await user.getDmChannel();
 		channel.send({ embed: embed });
 	}
 }
 
+/**
+ * Filters all reminders to remove expired reminders. Creates a collection for these expired reminders
+ */
 function filterReminders() {
 	let now = new Date();
 	let amt = 0;
@@ -427,10 +563,19 @@ function filterReminders() {
 	saveReminders();
 }
 
+/**
+ * Getter method for other classes
+ * @returns {Discord.Collection<Discord.Snowflake, Object>}
+ */
 function getReminders() {
 	return reminders;
 }
 
+/**
+ * Returns a collection of users that are signed up for the reminders in the reminder collection
+ * @param {Collection<Discord.Snowflake, Object>} collection
+ * @returns {Discord.Collection<Discord.Snowflake, Discord.User>}
+ */
 function getUsersWithReminders(collection = reminders) {
 	let users = new Discord.Collection();
 	collection.forEach(reminder => {
@@ -445,22 +590,24 @@ function getUsersWithReminders(collection = reminders) {
 	return users;
 }
 
+/**
+ * Returns a collection of reminders in which the user appears inside the optionally provided collection of reminders
+ * @param {User} user
+ * @param {Collection<Discord.Snowflake, Object>} collection
+ * @returns {Discord.Collection<Discord.Snowflake, Object>}
+ */
 function getRemindersOfUser(user, collection = reminders) {
 	return collection.filter(value => {
 		return value.users.includes(user.id);
 	});
 }
 
-function simplifyCollection(collection) {
-	let simple = new Discord.Collection();
-	let counter = 0;
-	collection.forEach(value => {
-		simple.set(counter, value);
-		counter++;
-	});
-	return simple;
-}
-
+/**
+ * Sends a reminder to a user
+ * @param {Snowflake} id
+ * @param {User} user
+ * @returns {Promise<void>}
+ */
 async function sendReminder(id, user) {
 	let reminder = reminders.get(id);
 	let msgLink = reminder.msgLink;
@@ -469,14 +616,19 @@ async function sendReminder(id, user) {
 	let tempText = 'I\'m here to remind you about [this message](<' + msgLink + '>).';
 	if (task != null) tempText += '\nThe task was:\n> ' + task;
 	let embed = new Discord.RichEmbed()
-		.setColor(0x00AE86)
+		.setColor(colors.GREEN)
 		.setTitle('Reminder!')
 		.setDescription(tempText);
 	if (userAmt > 0) embed.setFooter(userAmt + ' other ' + (userAmt === 1 ? 'person' : 'people') + ' also got this reminder!');
-	let channel = await getDmChannel(user);
+	let channel = await user.getDmChannel();
 	channel.send({ embed: embed });
 }
 
+/**
+ * Triggers a reminder
+ * @param {Snowflake} id
+ * @returns {Promise<void>}
+ */
 async function triggerReminder(id) {
 	let reminder = reminders.get(id);
 	let users = reminder.users;
@@ -489,12 +641,21 @@ async function triggerReminder(id) {
 	debug('Triggered reminder with id ' + id + '.');
 }
 
+/**
+ * Deletes a reminder
+ * @param {Snowflake} id
+ */
 function deleteReminder(id) {
 	reminders.delete(id);
 	saveReminders();
 	debug('Deleted reminder with id ' + id + '.');
 }
 
+/**
+ * Starts a reminder
+ * @param {Snowflake} id
+ * @returns {boolean}
+ */
 function startReminder(id) {
 	let reminder = reminders.get(id);
 	let now = new Date();
@@ -514,6 +675,9 @@ function startReminder(id) {
 	debug('Started reminder with id ' + id + '.');
 }
 
+/**
+ * Starts all reminders
+ */
 function startAllReminders() {
 	reminders.forEach((value, key) => {
 		startReminder(key);
@@ -521,6 +685,11 @@ function startAllReminders() {
 	debug('Started all reminder timers.');
 }
 
+/**
+ * Adds a user to the list of users of a reminder
+ * @param {User} user
+ * @param {Snowflake} id
+ */
 function joinReminder(user, id) {
 	let reminder = reminders.get(id);
 	if (!reminder.users.includes(user.id)) reminder.users.push(user.id);
@@ -528,6 +697,11 @@ function joinReminder(user, id) {
 	log(user + ' joined reminder ' + id + '.');
 }
 
+/**
+ * Removes a user from the list of users of a reminder
+ * @param {User} user
+ * @param {Snowflake} id
+ */
 function leaveReminder(user, id) {
 	let reminder = reminders.get(id);
 	if (reminder.users.includes(user.id)) reminder.users = reminder.users.filter(value => {
@@ -537,6 +711,10 @@ function leaveReminder(user, id) {
 	log(user + ' left reminder ' + id + '.');
 }
 
+/**
+ * Removes a user from the list of users of all reminders
+ * @param {User} user
+ */
 function leaveAllReminders(user) {
 	let userReminders = getRemindersOfUser(user);
 	for (let reminderEntry of userReminders) {
@@ -546,18 +724,20 @@ function leaveAllReminders(user) {
 	saveReminders();
 }
 
+/**
+ * Saves reminders to storage
+ */
 function saveReminders() {
 	Storage.reminders = Array.from(reminders);
 	saveData();
 	debug('Saved reminders.');
 }
 
-async function getDmChannel(user) {
-	if (user.bot) return undefined;
-	if (user.dmChannel != null) return user.dmChannel;
-	return await user.createDM();
-}
-
+/**
+ * Returns the boolean value of a <true|false> String
+ * @param {String} suffix
+ * @returns {boolean}
+ */
 function getBooleanValue(suffix) {
 	let newVal;
 	if (suffix === 'true') {

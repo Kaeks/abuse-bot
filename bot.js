@@ -1,21 +1,21 @@
 //// SETUP
 // IMPORTS
-const Discord = require('discord.js');
 const CronJob = require('cron').CronJob;
+const Discord = require('discord.js');
 const client = new Discord.Client();
 require('datejs');
 
 /// EXPORTS
 module.exports = {
-	client
+	Discord, client
 };
 
+// IMPORTS
 const common = require('./common.js');
 const {
 	fs,
 	Config, Storage, Blocked, Deleted, Edited,
 	saveData, saveBlocked, saveDeleted, saveEdited,
-	waterTimers, runningWaterTimers,
 	updatePresence,
 	sendWednesday
 } = common;
@@ -230,7 +230,7 @@ let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
 		if (cur.hasOwnProperty('wednesday')) continue;
 		if (cur.wednesday === true) {
 			let user = client.users.get(userEntry);
-			let channel = await common.getDmChannel(user);
+			let channel = await user.getDmChannel();
 			sendWednesday(channel);
 		}
 	}
@@ -257,6 +257,7 @@ function setUpServer(server) {
 
 /**
  * Sets up database space for a user
+ * @param msg
  * @param user
  */
 function setUpUser(msg, user) {

@@ -1,11 +1,10 @@
 const common = require('../common.js');
 const {
-	Config, Storage,
-	saveData,
+	Discord,
+	Storage, saveData,
 	waterTimers, runningWaterTimers,
-	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus
+	addWaterTimer, stopWaterTimer, updateWaterTimer, getWaterTimerStatus
 } = common;
-const Discord = require('discord.js');
 
 // Default water interval (in minutes) to be set when people join the water club
 const DEFAULT_WATER_INTERVAL = 60;

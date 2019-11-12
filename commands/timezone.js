@@ -1,5 +1,6 @@
 const common = require('../common.js');
-const Storage = require('../data.json');
+const { Discord, Storage } = common;
+
 module.exports = {
 	name : 'timezone',
 	args : common.argumentValues.NONE,
