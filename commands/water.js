@@ -135,7 +135,7 @@ module.exports = {
 						}
 						let newVal = common.getBooleanValue(suffix);
 						if (newVal === undefined) {
-							msg.channel.send('Must be `true` or `false`.').then((message => message.delete(3000)));
+							msg.channel.send('Must be `true` or `false`.').then((message => message.delete(5000)));
 							return false;
 						}
 						Storage.users[user.id].water.ignoreDnD = newVal;

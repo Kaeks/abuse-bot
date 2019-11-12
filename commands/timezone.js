@@ -24,7 +24,7 @@ module.exports = {
 				let user = msg.author;
 				Storage.users[user].timezone = args[1];
 			} else {
-				msg.channel.send('Missing argument: <time zone>').then(message => message.delete(3000));
+				msg.channel.send('Missing argument: <time zone>').then(message => message.delete(5000));
 			}
 		}
 	}

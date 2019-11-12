@@ -5,7 +5,7 @@ module.exports = {
 	args : common.argumentValues.NONE,
 	usage : [ '' ],
 	description : [ 'Ping!' ],
-	execute(message) {
-		message.channel.send('Pong.');
+	execute(msg) {
+		msg.channel.send('Pong.');
 	}
 };

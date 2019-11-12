@@ -11,6 +11,11 @@ Discord.User.prototype.getDmChannel = async function() {
 	return this.dmChannel != null ? this.dmChannel : await this.createDM();
 };
 
+Discord.User.prototype.sendDm = async function(data) {
+	let channel = await this.getDmChannel();
+	return channel.send(data);
+};
+
 /**
  * Returns the direct link to a message
  * @returns {String}
@@ -661,7 +666,31 @@ function startReminder(id) {
 	let now = new Date();
 	let future = new Date(reminder.date);
 	let timeDiff = future - now;
-	if (timeDiff < 0 ) {
+	// TODO REMOVE THIS AFTER FIXING ISSUE #8 >>>>>>>>>>>>>>>>
+	if (timeDiff > 2147483651) {
+		// Overflow for setTimeout
+		let users = reminder.users;
+		let userAmt = users.length - 1;
+		let msgLink = reminder.msgLink;
+		let embed = new Discord.RichEmbed()
+			.setColor(colors.RED)
+			.setTitle('Sorry!')
+			.setDescription(
+				'Unfortunately I cannot remind you about [this message](<' + msgLink + '>) ' +
+				(reminder.task.length > 0 ? '\nwith the task\n> ' + reminder.task + '\n' : '') +
+				'on ' + reminder.date + ' since the date was too far in the future for me to handle.' +
+				'\n[This is being worked on](https://github.com/Kaeks/wiktor-bot/issues/8)'
+			);
+		if (userAmt > 0) embed.setFooter(userAmt + ' other ' + (userAmt === 1 ? 'person' : 'people') + ' also cannot get this reminder.');
+		for (let userEntry of users) {
+			let user = client.users.get(userEntry);
+			user.sendDm({ embed: embed });
+		}
+		deleteReminder(id);
+		return false;
+	}
+	// TODO REMOVE THIS AFTER FIXING ISSUE #8 <<<<<<<<<<<<<<<<
+	if (timeDiff < 0) {
 		deleteReminder(id);
 		return false;
 	}
@@ -689,26 +718,32 @@ function startAllReminders() {
  * Adds a user to the list of users of a reminder
  * @param {User} user
  * @param {Snowflake} id
+ * @return {boolean} success
  */
 function joinReminder(user, id) {
 	let reminder = reminders.get(id);
-	if (!reminder.users.includes(user.id)) reminder.users.push(user.id);
+	if (reminder.users.includes(user.id)) return false;
+	reminder.users.push(user.id);
 	saveReminders();
 	log(user + ' joined reminder ' + id + '.');
+	return true;
 }
 
 /**
  * Removes a user from the list of users of a reminder
  * @param {User} user
  * @param {Snowflake} id
+ * @return {boolean} success
  */
 function leaveReminder(user, id) {
 	let reminder = reminders.get(id);
-	if (reminder.users.includes(user.id)) reminder.users = reminder.users.filter(value => {
+	if (!reminder.users.includes(user.id)) return false;
+	reminder.users = reminder.users.filter(value => {
 		return value !== user.id;
 	});
 	saveReminders();
 	log(user + ' left reminder ' + id + '.');
+	return true;
 }
 
 /**
