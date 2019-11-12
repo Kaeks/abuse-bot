@@ -339,12 +339,16 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 			return true;
 		} else {
 			common.warn('Command \'' + commandString + '\' has not been implemented.');
-			msg.channel.send('This command doesn\'t have an implemented function.');
+			let embed = new Discord.RichEmbed()
+				.setColor(common.colors.RED)
+				.setTitle('Not available!')
+				.setDescription('The command `' + Config.prefix + commandString + '` doesn\'t have an implemented function.');
+			msg.channel.send({ embed: embed });
 			return false;
 		}
 	} else {
 		let embed = new Discord.RichEmbed()
-			.setColor('00AE86')
+			.setColor(common.colors.GREEN)
 			.setTitle('Help for ' + commandString)
 			.setDescription(common.getCommandHelp(command, commandChain));
 		msg.channel.send({ embed: embed });
@@ -417,7 +421,11 @@ function handleCommand(msg) {
 		return true;
 	} catch (e) {
 		console.error(e.stack);
-		msg.channel.send('Internal Error. Command `' + commandName + '` failed.').catch(console.error);
+		let embed = new Discord.RichEmbed()
+			.setColor(common.colors.RED)
+			.setTitle('Internal Error!')
+			.setDescription('Command `' + commandName + '` failed.');
+		msg.channel.send({ embed: embed });
 	}
 	return false;
 }
