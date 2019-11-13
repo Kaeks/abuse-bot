@@ -142,7 +142,7 @@ module.exports = {
 	waterTimers, runningWaterTimers,
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
 	reminders, runningReminders, getReminders, getRemindersOfUser,
-	addReminder, loadReminders, startReminder, startAllReminders, filterReminders, leaveAllReminders, joinReminder, leaveReminder,
+	addReminder, loadReminders, startReminder, stopReminder, startAllReminders, filterReminders, leaveAllReminders, joinReminder, leaveReminder,
 	getBooleanValue, getUsers, getTimeZone, testBooleanValue
 };
 
@@ -391,6 +391,7 @@ async function sendWater(user) {
 		return false;
 	}
 	let embed = new Discord.RichEmbed()
+		.setColor(colors.BLURPLE)
 		.setTitle('Stay hydrated!')
 		.setDescription('Drink some water **now**.')
 		.setThumbnail('https://media.istockphoto.com/photos/splash-fresh-drop-in-water-close-up-picture-id801948192');
@@ -491,6 +492,54 @@ function getWaterTimerStatus(user) {
 }
 
 // REMINDERS
+/**
+ * Runs a function on a specific date
+ * @param {Date} date
+ * @param {Function} func
+ */
+function runAtDate(date, func) {
+	let now = new Date();
+	let diff = date - now;
+	if (diff > 0x7FFFFFFF) { // setTimeout limit
+		return setTimeout(function() {
+			return runAtDate(date, func);
+		}, 0x7FFFFFFF);
+	} else {
+		return setTimeout(func, diff);
+	}
+}
+
+/**
+ * Recursive running function of a reminder to handle times larger than the 32-bit signed positive integer limit in milliseconds
+ * @param {Snowflake} id
+ * @param {Date} started
+ */
+function runReminderTimer(id, started = new Date()) {
+	let now = new Date();
+	let future = new Date(reminders.get(id).date);
+	let diff = future - now;
+	if (diff < 0) {
+		info('Reminder with id ' + id + ' has its starting point in the past. Deleting.');
+		deleteReminder(id);
+		return false;
+	}
+	let timer;
+	if (diff > 0x7FFFFFFF) {
+		timer = setTimeout(function() {
+			runReminderTimer(id, started);
+		});
+	} else {
+		timer = setTimeout(function() {
+			triggerReminder(id);
+		}, diff);
+	}
+	runningReminders.set(id, {
+		timer : timer,
+		started : started
+	});
+	return true;
+}
+
 /**
  * Adds a new reminder
  * @param {Message} msg
@@ -656,13 +705,35 @@ async function triggerReminder(id) {
 }
 
 /**
+ * Stops a reminder
+ * @param {Snowflake} id
+ */
+function stopReminder(id) {
+	if (!runningReminders.has(id)) {
+		info('Timer of reminder with id ' + id + ' was not running.');
+		return false;
+	}
+	let timerEntry = runningReminders.get(id);
+	clearInterval(timerEntry.timer);
+	runningReminders.delete(id);
+	debug('Stopped timer of reminder with id ' + id + '.');
+	return true;
+}
+
+/**
  * Deletes a reminder
  * @param {Snowflake} id
  */
 function deleteReminder(id) {
+	if (!reminders.has(id)) {
+		info('Reminder with id ' + id + ' does not exist and could not be deleted.');
+		return false;
+	}
+	stopReminder(id);
 	reminders.delete(id);
 	saveReminders();
 	debug('Deleted reminder with id ' + id + '.');
+	return true;
 }
 
 /**
@@ -671,45 +742,10 @@ function deleteReminder(id) {
  * @returns {boolean}
  */
 function startReminder(id) {
-	let reminder = reminders.get(id);
-	let now = new Date();
-	let future = new Date(reminder.date);
-	let timeDiff = future - now;
-	// TODO REMOVE THIS AFTER FIXING ISSUE #8 >>>>>>>>>>>>>>>>
-	if (timeDiff > 2147483651) {
-		// Overflow for setTimeout
-		let users = reminder.users;
-		let userAmt = users.length - 1;
-		let msgLink = reminder.msgLink;
-		let embed = new Discord.RichEmbed()
-			.setColor(colors.RED)
-			.setTitle('Sorry!')
-			.setDescription(
-				'Unfortunately I cannot remind you about [this message](<' + msgLink + '>) ' +
-				(reminder.task.length > 0 ? '\nwith the task\n> ' + reminder.task + '\n' : '') +
-				'on ' + reminder.date + ' since the date was too far in the future for me to handle.' +
-				'\n[This is being worked on](https://github.com/Kaeks/wiktor-bot/issues/8)'
-			);
-		if (userAmt > 0) embed.setFooter(userAmt + ' other ' + (userAmt === 1 ? 'person' : 'people') + ' also cannot get this reminder.');
-		for (let userEntry of users) {
-			let user = client.users.get(userEntry);
-			user.sendDm({ embed: embed });
-		}
-		deleteReminder(id);
+	if (!runReminderTimer(id)) {
+		info('Reminder with id ' + id + ' could not be started.');
 		return false;
 	}
-	// TODO REMOVE THIS AFTER FIXING ISSUE #8 <<<<<<<<<<<<<<<<
-	if (timeDiff < 0) {
-		deleteReminder(id);
-		return false;
-	}
-	let timer = setTimeout(function() {
-		triggerReminder(id);
-	}, timeDiff);
-	runningReminders.set(id, {
-		timer : timer,
-		started : now
-	});
 	debug('Started reminder with id ' + id + '.');
 }
 
@@ -792,6 +828,12 @@ function getBooleanValue(suffix) {
 	return newVal
 }
 
+/**
+ * Tests the value of a should-be boolean input. Sends an error message to the message's channel if the value is not a boolean
+ * @param {Message} msg
+ * @param {boolean} value
+ * @returns {boolean}
+ */
 function testBooleanValue(msg, value) {
 	if (value === undefined) {
 		let embed = new Discord.RichEmbed()

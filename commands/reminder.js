@@ -138,21 +138,34 @@ module.exports = {
 			usage : '',
 			description : 'List all reminders',
 			execute(msg) {
-				let simpleReminders = common.getRemindersOfUser(msg.author).simplify();
+				let user = msg.author;
+				let simpleReminders = common.getRemindersOfUser(user).simplify();
 				let embed = new Discord.RichEmbed()
 					.setColor(common.colors.GREEN);
-				let tempText = '**' + msg.author + '\'s reminders:**\n';
+				let tempText = '**' + user + '\'s reminders:**\n';
 				if (simpleReminders.size > 0) {
 					simpleReminders.forEach((reminder, index) => {
-						tempText += '**#' + (index) + '** ' + common.parseDate(reminder.date);
+						tempText += '**#' + (index) + '** [' + common.parseDate(reminder.date);
 						if (reminder.task.length > 0) {
 							tempText += ' - ' + reminder.task;
 						}
+						tempText += '](<' + reminder.msgLink + '>)';
 						if (index !== simpleReminders.lastKey()) {
 							tempText += '\n';
 						}
 					});
 					embed.setDescription(tempText);
+					if (msg.channel.type !== 'dm') {
+						let userString =
+							msg.channel.type === 'text' ?
+								(msg.member.nickname != null ? msg.member.nickname : user.username) + ' (' + user.username + '#' + user.discriminator + ')' :
+								msg.channel.type === 'group' ?
+									user.username + '#' + user.discriminator :
+									'';
+						embed.setFooter(
+							'Click on the individual reminders to scroll to the message they refer to.' +
+							'\nIf the reminder was issued in a DM the link won\'t work for others except for ' + userString + '.');
+					}
 				} else {
 					embed.setDescription(tempText + 'You don\'t have any reminders.');
 				}
