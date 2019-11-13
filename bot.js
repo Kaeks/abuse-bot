@@ -237,10 +237,6 @@ let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
 }, null, true, 'Europe/Berlin');
 
 //// METHODS
-function getTimeZone(user) {
-	return Storage.users[user.id].timeZone;
-}
-
 /**
  * Sets up database space for a server
  * @param server

@@ -6,7 +6,7 @@ module.exports = {
 	args : common.argumentValues.OPTIONAL,
 	usage : [
 		'',
-		'<command>'
+		'[command]'
 	],
 		description : [
 		'Show help for all commands.',

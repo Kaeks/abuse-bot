@@ -13,7 +13,7 @@ module.exports = {
 			args : common.argumentValues.OPTIONAL,
 			usage : [
 				'',
-				'<newPrefix>'
+				'[newPrefix]'
 			],
 			description : [
 				'View prefix',
@@ -21,13 +21,21 @@ module.exports = {
 			],
 			execute(msg, suffix) {
 				if (suffix == null) {
-					msg.channel.send('Bot prefix is currently `' + Config.prefix + '`.');
+					let embed = new Discord.RichEmbed()
+						.setColor(common.colors.GREEN)
+						.setTitle('Bot prefix')
+						.setDescription('Bot prefix is currently `' + Config.prefix + '`.');
+					msg.channel.send({ embed: embed });
 				} else {
 					let newPrefix = suffix;
 					Config.prefix = newPrefix;
 					saveConfig();
-					msg.channel.send('Bot prefix has been set to `' + newPrefix + '`.');
 					common.updatePresence();
+					let embed = new Discord.RichEmbed()
+						.setColor(common.colors.GREEN)
+						.setTitle('Bot prefix set!')
+						.setDescription('Bot prefix has been set to `' + newPrefix + '`.');
+					msg.channel.send({ embed: embed });
 				}
 			}
 		},
@@ -36,7 +44,7 @@ module.exports = {
 			args : common.argumentValues.OPTIONAL,
 			usage : [
 				'',
-				'<true|false>'
+				'[true|false]'
 			],
 			description : [
 				'View debug logging',
@@ -44,16 +52,21 @@ module.exports = {
 			],
 			execute(msg, suffix) {
 				if (suffix == null) {
-					msg.channel.send('`debug` is set to `' + Config.debug + '`.');
+					let embed = new Discord.RichEmbed()
+						.setColor(common.colors.GREEN)
+						.setTitle('Debug mode')
+						.setDescription('`debug` is set to `' + Config.debug + '`.');
+					msg.channel.send({ embed: embed });
 				} else {
-					let newVal = common.getBooleanValue(suffix);
-					if (newVal === undefined) {
-						msg.channel.send('Must be `true` or `false`.').then((message => message.delete(5000)));
-						return false;
-					}
-					Config.debug = newVal;
-					msg.channel.send('`debug` has been set to `' + suffix + '`.');
+					let boolValue = common.getBooleanValue(suffix);
+					if (!common.testBooleanValue(msg, boolValue)) return false;
+					Config.debug = boolValue;
 					saveConfig();
+					let embed = new Discord.RichEmbed()
+						.setColor(common.colors.GREEN)
+						.setTitle('Debug mode set!')
+						.setDescription('`debug` has been set to `' + suffix + '`.');
+					msg.channel.send({ embed: embed });
 				}
 			}
 		}

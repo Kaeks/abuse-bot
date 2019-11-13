@@ -25,20 +25,25 @@ module.exports = {
 				common.debug('dateString: ' + dateString);
 				common.debug('taskString: ' + taskString);
 
+				let embed = new Discord.RichEmbed();
+
 				// optionString has been found within the suffix, but nothing follows
 				if (mPosition > -1 && taskString.length === 0) {
-					msg.channel.send('Missing task after `-m` option.');
+					embed.setColor(common.colors.RED)
+						.setTitle('Missing task!')
+						.setDescription('You provided the `-m` option, but it\'s missing a task.');
+					msg.channel.send({ embed: embed })
+						.then(message => message.delete(5000));
 					return false;
 				}
-
-				let embed = new Discord.RichEmbed();
 				
 				let date = Date.parse(dateString);
 				if (date == null) { // this is right but linter says no
 					embed.setColor(common.colors.RED)
 						.setTitle('Invalid time/date input!')
 						.setDescription('`' + dateString + '` could not be converted into a usable timestamp.');
-					msg.channel.send({ embed: embed }).then(message => message.delete(5000));
+					msg.channel.send({ embed: embed })
+						.then(message => message.delete(5000));
 					return false;
 				}
 				let msgLink = msg.getLink();

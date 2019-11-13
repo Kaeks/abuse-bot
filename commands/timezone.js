@@ -1,5 +1,8 @@
 const common = require('../common.js');
-const { Discord, Storage } = common;
+const {
+	Discord, Storage,
+	getTimeZone
+} = common;
 
 module.exports = {
 	name : 'timezone',
@@ -9,23 +12,16 @@ module.exports = {
 			name : 'set',
 			args : common.argumentValues.REQUIRED,
 			usage : '<timezone>',
-			description : 'Set a new time zone. (Format: +/-HHMM)'
+			description : 'Set a new time zone. (Format: +/-HHMM)',
+			execute(msg, suffix) {
+				let user = msg.author;
+				Storage.users[user].timezone = suffix;
+			}
 		}
 	],
 	usage :	'',
 	description : 'Display your current set time zone.',
 	execute(msg, suffix) {
-		if (suffix === '') {
-			getTimeZone(msg.author);
-		}
-		let args = suffix.split(' ');
-		if (args[0] === 'set') {
-			if (args[1] !== undefined) {
-				let user = msg.author;
-				Storage.users[user].timezone = args[1];
-			} else {
-				msg.channel.send('Missing argument: <time zone>').then(message => message.delete(5000));
-			}
-		}
+		getTimeZone(msg.author);
 	}
 };

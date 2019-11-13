@@ -8,7 +8,12 @@ module.exports = {
 	description : 'Spam <user>\'s DMs.',
 	execute(msg) {
 		if (msg.channel.type === 'dm') {
-			msg.channel.send('Spamming is not available in DMs.');
+			let embed = new Discord.RichEmbed()
+				.setColor(common.colors.RED)
+				.setTitle('Not available!')
+				.setDescription('Spamming is not available in DMs.');
+			msg.channel.send({ embed: embed })
+				.then(message => message.delete(5000));
 			return false;
 		}
 		if (msg.mentions.users.size > 0) {

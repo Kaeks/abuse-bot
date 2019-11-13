@@ -143,7 +143,7 @@ module.exports = {
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
 	reminders, runningReminders, getReminders, getRemindersOfUser,
 	addReminder, loadReminders, startReminder, startAllReminders, filterReminders, leaveAllReminders, joinReminder, leaveReminder,
-	getBooleanValue, getUsers
+	getBooleanValue, getUsers, getTimeZone, testBooleanValue
 };
 
 //// METHODS
@@ -273,6 +273,15 @@ function parseDate(date) {
 		dateString = Date.parse(date).toString('HH:mm');
 	}
 	return dateString;
+}
+
+/**
+ * Gets the time zone of a user
+ * @param {User} user
+ * @returns {string | *}
+ */
+function getTimeZone(user) {
+	return Storage.users[user.id].timeZone;
 }
 
 /**
@@ -781,6 +790,19 @@ function getBooleanValue(suffix) {
 		newVal = false;
 	}
 	return newVal
+}
+
+function testBooleanValue(msg, value) {
+	if (value === undefined) {
+		let embed = new Discord.RichEmbed()
+			.setColor(colors.RED)
+			.setTitle('Invalid value!')
+			.setDescription('Can only be set to `true` or `false`.');
+		msg.channel.send({ embed: embed })
+			.then(message => message.delete(5000));
+		return false;
+	}
+	return true;
 }
 
 function getUsers() {

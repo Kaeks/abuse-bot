@@ -20,8 +20,8 @@ module.exports = {
 			description : 'Display your current water status.',
 			execute(msg) {
 				let user = msg.author;
-				if (!checkWaterMember(user)) {
-					msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+				if (!isWaterMember(user)) {
+					sendNotInWaterClub(msg);
 					return false;
 				}
 				let milliseconds = getWaterTimerStatus(user);
@@ -29,7 +29,11 @@ module.exports = {
 				let minutes = Math.floor(seconds / 60);
 				let newSeconds = seconds - minutes * 60;
 				let string = minutes + ' minutes, ' + newSeconds + ' seconds';
-				msg.channel.send('Your next reminder will be issued in ' + string + '.');
+				let embed = new Discord.RichEmbed()
+					.setColor(common.colors.GREEN)
+					.setTitle('Next reminder!')
+					.setDescription('Your next reminder will be issued in ' + string + '.');
+				msg.channel.send({ embed: embed });
 			}
 		},
 		{
@@ -42,14 +46,24 @@ module.exports = {
 				let storageUser = Storage.users[user.id];
 				storageUser = storageUser || {};
 				storageUser.water = storageUser.water || {};
-				if (checkWaterMember(user)) {
-					msg.channel.send('You are already a member of the water club!');
+				let embed = new Discord.RichEmbed();
+				if (isWaterMember(user)) {
+					embed.setColor(common.colors.RED)
+						.setTitle('Already a HydroHomie!')
+						.setDescription('You are already a member of the water club!');
+					msg.channel.send({ embed: embed });
 					return false;
 				}
 				storageUser.water.enabled = true;
 				storageUser.water.interval = storageUser.water.interval || DEFAULT_WATER_INTERVAL;
 				saveData();
-				msg.channel.send('Welcome to the water club, ' + msg.author + '!\nYou will be notified every ' + DEFAULT_WATER_INTERVAL + ' minutes (default value).');
+				embed.setColor(common.colors.GREEN)
+					.setTitle('Welcome!')
+					.setDescription(
+						'You are now a HydroHomie, ' + user + '!' +
+						'\nYou will be notified every ' + storageUser.water.interval + ' minutes (default value).'
+					);
+				msg.channel.send({ embed: embed });
 				addWaterTimer(user);
 			}
 		},
@@ -60,14 +74,18 @@ module.exports = {
 			description : 'Leave the water club.',
 			execute(msg) {
 				let user = msg.author;
-				if (!checkWaterMember(user)) {
-					msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+				if (!isWaterMember(user)) {
+					sendNotInWaterClub(msg);
 					return false;
 				}
 				Storage.users[user.id].water.enabled = false;
 				saveData();
-				msg.channel.send('You have left the water club. Sad to see you go! :(');
 				stopWaterTimer(user);
+				let embed = new Discord.RichEmbed()
+					.setColor(common.colors.GREEN)
+					.setTitle('No longer a HydroHomie')
+					.setDescription('You have left the water club. Sad to see you go! :(');
+				msg.channel.send({ embed: embed });
 			}
 		},
 		{
@@ -81,8 +99,8 @@ module.exports = {
 					description : 'Set a new interval (in minutes)',
 					execute(msg, suffix) {
 						let user = msg.author;
-						if (!checkWaterMember(user)) {
-							msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+						if (!isWaterMember(user)) {
+							sendNotInWaterClub(msg);
 							return false;
 						}
 						let newIntervalString = suffix;
@@ -91,17 +109,33 @@ module.exports = {
 								let newInterval = parseInt(newIntervalString, 10);
 								Storage.users[user.id].water.interval = newInterval;
 								saveData();
-								msg.channel.send('Water interval has been set to ' + newInterval + ' minutes.');
+
 								common.debug(waterTimers);
 								common.debug(runningWaterTimers);
 								updateWaterTimer(user);
 								common.debug(waterTimers);
 								common.debug(runningWaterTimers);
+
+								let embed = new Discord.RichEmbed()
+									.setColor(common.colors.GREEN)
+									.setTitle('Water interval updated!')
+									.setDescription('Water interval has been set to ' + newInterval + ' minutes.');
+								msg.channel.send({ embed: embed });
 							} else {
-								msg.channel.send('<interval> must be above 0.');
+								let embed = new Discord.RichEmbed()
+									.setColor(common.colors.RED)
+									.setTitle('0 or below!')
+									.setDescription('<interval> must be above 0.');
+								msg.channel.send({ embed: embed })
+									.then(message => message.delete(5000));
 							}
 						} else {
-							msg.channel.send('<interval> must be an integer.');
+							let embed = new Discord.RichEmbed()
+								.setColor(common.colors.RED)
+								.setTitle('Not a number!')
+								.setDescription('<interval> must be an integer.');
+							msg.channel.send({ embed: embed })
+								.then(message => message.delete(5000));
 						}
 					}
 				}
@@ -110,12 +144,16 @@ module.exports = {
 			description : 'Display your current interval',
 			execute(msg) {
 				let user = msg.author;
-				if (!checkWaterMember(user)) {
-					msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+				if (!isWaterMember(user)) {
+					sendNotInWaterClub(msg);
 					return false;
 				}
 				let userInterval = Storage.users[user.id].water.interval;
-				msg.channel.send('Your interval is set to ' + userInterval + ' minutes.');
+				let embed = new Discord.RichEmbed()
+					.setColor(common.colors.GREEN)
+					.setTitle('Water interval.')
+					.setDescription('Your interval is set to ' + userInterval + ' minutes.');
+				msg.channel.send({ embed: embed });
 			}
 		},
 		{
@@ -129,18 +167,19 @@ module.exports = {
 					description : [ 'Set whether or not I should ignore your DnD status and send you water reminders regardless.' ],
 					execute(msg, suffix) {
 						let user = msg.author;
-						if (!checkWaterMember(user)) {
-							msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+						if (!isWaterMember(user)) {
+							sendNotInWaterClub(msg);
 							return false;
 						}
-						let newVal = common.getBooleanValue(suffix);
-						if (newVal === undefined) {
-							msg.channel.send('Must be `true` or `false`.').then((message => message.delete(5000)));
-							return false;
-						}
-						Storage.users[user.id].water.ignoreDnD = newVal;
-						msg.channel.send('I am going to ' + (newVal ? 'ignore' : 'respect') + ' your DnD status from now on.');
+						let boolValue = common.getBooleanValue(suffix);
+						if (!common.testBooleanValue(msg, boolValue)) return false;
+						Storage.users[user.id].water.ignoreDnD = boolValue;
 						saveData();
+						let embed = new Discord.RichEmbed()
+							.setColor(common.colors.GREEN)
+							.setTitle('Now ' + (boolValue ? 'ignoring' : 'respecting') + ' DnD!')
+							.setDescription('I am going to ' + (boolValue ? 'ignore' : 'respect') + ' your DnD status from now on.');
+						msg.channel.send({ embed: embed });
 					}
 				}
 			],
@@ -148,24 +187,36 @@ module.exports = {
 			description : [ 'View whether I ignore your DnD status.' ],
 			execute(msg) {
 				let user = msg.author;
-				if (!checkWaterMember(user)) {
-					msg.channel.send('Wait, that\'s illegal. You are not a member of the water club.');
+				if (!isWaterMember(user)) {
+					sendNotInWaterClub(msg);
 					return false;
 				}
-				if (Storage.users[user.id].water.ignoreDnD === true) {
-					msg.channel.send('I am currently ignoring your DnD status.');
-				} else {
-					msg.channel.send('I am currently respecting your DnD status.');
-				}
+				let ignoring = Storage.users[user.id].water.ignoreDnd;
+				let embed = new Discord.RichEmbed()
+					.setColor(common.colors.GREEN)
+					.setTitle((ignoring ? 'Ignoring' : 'Respecting') + ' DnD!')
+					.setDescription('I am currently ' + (ignoring ? 'ignoring' : 'respecting') + ' your DnD status.');
+				msg.channel.send({ embed: embed });
 			}
 		}
 	]
 };
 
-function checkWaterMember(user) {
+function isWaterMember(user) {
 	return !(
 		Storage.users[user.id] === undefined ||
 		Storage.users[user.id].water === undefined ||
 		Storage.users[user.id].water.enabled !== true
 	);
+}
+
+function sendNotInWaterClub(msg) {
+	if (!isWaterMember(msg.author)) {
+		let embed = new Discord.RichEmbed()
+			.setColor(common.colors.RED)
+			.setTitle('Not a HydroHomie!')
+			.setDescription('That command is only available for members of the water club.');
+		msg.channel.send({ embed: embed })
+			.then(message => message.delete(5000));
+	}
 }
