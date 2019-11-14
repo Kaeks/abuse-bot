@@ -141,40 +141,103 @@ module.exports = {
 			description : 'List all reminders',
 			execute(msg) {
 				let user = msg.author;
-				let simpleReminders = common.getRemindersOfUser(user).simplify();
-				let embed = new Discord.RichEmbed()
-					.setColor(common.colors.GREEN)
-					.setTitle('Reminders!')
-					.setAuthor(msg.author.username, msg.author.avatarURL);
-
-				let tempText = '';
-				if (simpleReminders.size > 0) {
-					simpleReminders.forEach((reminder, index) => {
-						let realDate = new Date(reminder.date);
-						let indexString = '**#' + index + '**';
-						let linkString = '[' + common.parseDate(realDate) + '](<' + reminder.msgLink + '>)';
-						let taskString = reminder.task.length > 0 ? '\n> ' + reminder.task : '';
-						let nl = index !== simpleReminders.lastKey() ? '\n' : '';
-						tempText += indexString + ' ' + linkString + taskString + nl;
-					});
-					embed.setDescription(tempText);
-
-					if (msg.channel.type !== 'dm') {
-						let userString =
-							msg.channel.type === 'text' ?
-								(msg.member.nickname != null ? msg.member.nickname : user.username) + ' (' + user.username + '#' + user.discriminator + ')' :
-								msg.channel.type === 'group' ?
-									user.username + '#' + user.discriminator :
-									'';
-						embed.setFooter(
-							'Click on the individual reminders to scroll to the message they refer to.' +
-							'\nIf the reminder was issued in a DM the link won\'t work for others except for ' + userString + '.');
-					}
-				} else {
-					embed.setDescription('You don\'t have any reminders.');
-				}
-				msg.channel.send({embed : embed});
+				sendReminderList(msg, user);
 			}
 		}
 	]
 };
+
+const ITEM_LIMIT = 10;
+
+const emojiNums = {
+	0 : '0️⃣',
+	1 : '1️⃣',
+	2 : '2️⃣',
+	3 : '3️⃣',
+	4 : '4️⃣',
+	5 : '5️⃣',
+	6 : '6️⃣',
+	7 : '7️⃣',
+	8 : '8️⃣',
+	9 : '9️⃣',
+	10: '🔟'
+}
+
+function getSingleReminderString(index, reminder) {
+	let realDate = new Date(reminder.date);
+	let indexString = '**#' + index + '**';
+	let linkString = '[' + common.parseDate(realDate) + '](<' + reminder.msgLink + '>)';
+	let taskString = reminder.task.length > 0 ? '\n> ' + reminder.task : '';
+	return indexString + ' ' + linkString + taskString;
+
+}
+
+function getSubList(collection, page = 0) {
+	let subList = new Discord.Collection();
+	for (let i = page * ITEM_LIMIT; i < ITEM_LIMIT * (page + 1) - 1; i++) {
+		let cur = collection[i];
+		console.log(cur);
+		if (cur === undefined) break;
+		subList.set(cur[0], cur[1]);
+	}
+	return subList;
+}
+
+function sendReminderList(msg, user, page = 0) {
+
+	let simpleReminders = common.getRemindersOfUser(user).simplify();
+	
+	// Filter out people with 0 reminders
+	if (simpleReminders.size === 0) {
+		embed.setDescription('You don\'t have any reminders.');
+		msg.channel.send({embed : embed});
+		return false;
+	}
+
+	// Throw error when we are on a page that doesn't exist with the amount of reminders the user has
+	// e.g. page 2 does not exist with only 10 reminders
+	if (simpleReminders.size < page * ITEM_LIMIT + 1) {
+		throw 'Size of the collection of reminders is too small for the given page count (' + page + ').';
+	}
+
+	let hasPrev = page > 0;
+	let hasNext = (page + 1) * ITEM_LIMIT < simpleReminders.size;
+
+	let embed = new Discord.RichEmbed()
+		.setColor(common.colors.GREEN)
+		.setTitle('Reminders!')
+		.setAuthor(user.username, user.avatarURL);
+
+	let tempText = '';
+
+	let subList = getSubList(simpleReminders, page);
+	subList.forEach((reminder, key) => {
+		tempText += getSingleReminderString(key, reminder);
+		if (key !== subList.lastKey) tempText += '\n';
+	});
+
+	embed.setDescription(tempText);
+
+	if (msg.channel.type !== 'dm') {
+		let userHandle = user.username + '#' + discriminator;
+		let userString = msg.channel.type === 'text' ?
+			(msg.member.nickname | user.username) + ' (' + userHandle + ')' :
+			msg.channel.type === 'group' ? userHandle : '';
+		embed.setFooter(
+			'Click on the individual reminders to scroll to the message they refer to.' +
+			'\nIf the reminder was issued in a DM the link won\'t work for others except for ' + userString + '.');
+	}
+
+	let messagePromise = msg.channel.send({embed : embed}).then(message => {
+		if (hasPrev) {
+			message.react('🔼');
+		}
+		if (hasNext) {
+			message.react('🔽');
+		}
+		if (msg.channel.type !== 'dm') {
+
+		}
+	});
+	return true;
+}
