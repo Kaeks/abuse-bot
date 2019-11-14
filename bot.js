@@ -3,11 +3,11 @@
 const CronJob = require('cron').CronJob;
 const Discord = require('discord.js');
 const client = new Discord.Client();
-require('datejs');
+const chrono = require('chrono-node');
 
 /// EXPORTS
 module.exports = {
-	Discord, client
+	Discord, chrono, client
 };
 
 // IMPORTS

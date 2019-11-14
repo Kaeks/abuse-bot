@@ -1,6 +1,6 @@
 const common = require('../common.js');
 const {
-	Discord, Config,
+	Discord, chrono,
 	addReminder, leaveReminder, leaveAllReminders
 } = common;
 
@@ -37,8 +37,10 @@ module.exports = {
 					return false;
 				}
 				
-				let date = Date.parse(dateString);
-				if (date == null) { // this is right but linter says no
+				let date = chrono.parseDate(dateString, new Date());
+				common.debug('Parsed date: ' + date);
+
+				if (date == null) {
 					embed.setColor(common.colors.RED)
 						.setTitle('Invalid time/date input!')
 						.setDescription('`' + dateString + '` could not be converted into a usable timestamp.');
@@ -141,20 +143,22 @@ module.exports = {
 				let user = msg.author;
 				let simpleReminders = common.getRemindersOfUser(user).simplify();
 				let embed = new Discord.RichEmbed()
-					.setColor(common.colors.GREEN);
-				let tempText = '**' + user + '\'s reminders:**\n';
+					.setColor(common.colors.GREEN)
+					.setTitle('Reminders!')
+					.setAuthor(msg.author.username, msg.author.avatarURL);
+
+				let tempText = '';
 				if (simpleReminders.size > 0) {
 					simpleReminders.forEach((reminder, index) => {
-						tempText += '**#' + (index) + '** [' + common.parseDate(reminder.date);
-						if (reminder.task.length > 0) {
-							tempText += ' - ' + reminder.task;
-						}
-						tempText += '](<' + reminder.msgLink + '>)';
-						if (index !== simpleReminders.lastKey()) {
-							tempText += '\n';
-						}
+						let realDate = new Date(reminder.date);
+						let indexString = '**#' + index + '**';
+						let linkString = '[' + common.parseDate(realDate) + '](<' + reminder.msgLink + '>)';
+						let taskString = reminder.task.length > 0 ? '\n> ' + reminder.task : '';
+						let nl = index !== simpleReminders.lastKey() ? '\n' : '';
+						tempText += indexString + ' ' + linkString + taskString + nl;
 					});
 					embed.setDescription(tempText);
+
 					if (msg.channel.type !== 'dm') {
 						let userString =
 							msg.channel.type === 'text' ?
@@ -167,7 +171,7 @@ module.exports = {
 							'\nIf the reminder was issued in a DM the link won\'t work for others except for ' + userString + '.');
 					}
 				} else {
-					embed.setDescription(tempText + 'You don\'t have any reminders.');
+					embed.setDescription('You don\'t have any reminders.');
 				}
 				msg.channel.send({embed : embed});
 			}

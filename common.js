@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { Discord, client } = require('./bot.js');
+const { Discord, chrono, client } = require('./bot.js');
 
 //// AMENDS
 Number.prototype.pad = function(size) {
@@ -138,10 +138,35 @@ let colors = {
 	PRESTIGE : 0xFBC100
 };
 
+let daysOfWeek = {
+	0	:	{name : 'Sunday',	short : 'Sun'},
+	1	:	{name : 'Monday',	short : 'Mon'},
+	2	:	{name : 'Tuesday',	short : 'Tue'},
+	3	:	{name :	'Wednesday',short : 'Wed'},
+	4	:	{name : 'Thursday',	short : 'Thu'},
+	5	:	{name : 'Friday',	short : 'Fri'},
+	6	:	{name : 'Saturday',	short : 'Sat'}
+};
+
+let months = {
+	0	:	{name : 'January',	short : 'Jan'},
+	1	:	{name : 'February',	short : 'Feb'},
+	2	:	{name : 'March',	short : 'Mar'},
+	3	:	{name : 'April',	short : 'Apr'},
+	4	:	{name : 'May',		short : 'May'},
+	5	:	{name : 'June',		short : 'Jun'},
+	6	:	{name : 'July',		short : 'Jul'},
+	7	:	{name : 'August',	short : 'Aug'},
+	8	:	{name : 'September',short : 'Sep'},
+	9	:	{name : 'October',	short : 'Oct'},
+	10	:	{name : 'November',	short : 'Nov'},
+	11	:	{name : 'December',	short : 'Dec'}
+};
+
 //// EXPORTS
 module.exports = {
-	Discord,
-	fs, client,
+	Discord, fs, chrono,
+	client,
 	Config, Storage, Blocked, Deleted, Edited,
 	loadFile, saveFile,
 	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited,
@@ -246,6 +271,17 @@ function saveEdited() 	{saveFile(EDITED_PATH, 	Edited);	}
 
 // HELPERS
 /**
+ * Returns a number with its ordinal (1st, 2nd, 3rd, 4th, ...)
+ * @param {Number} n
+ * @returns {String}
+ */
+function getNumberWithOrdinal(n) {
+	let s = ["th","st","nd","rd"],
+		v = n % 100;
+	return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+/**
  * Enum for the game types a {Discord.Presence} can have
  * @type {{WATCHING: number, LISTENING: number, STREAMING: number, PLAYING: number}}
  */
@@ -279,17 +315,45 @@ function updatePresence(status = 'online', name = Config.prefix + 'help', type =
  * @returns {String}
  */
 function parseDate(date) {
-	let dateString;
-	if (Date.compare(Date.parse(date), (1).day().fromNow()) === 1) {
-		if (Date.compare(Date.parse(date), (1).year().fromNow()) === 1) {
-			dateString = Date.parse(date).toString('MMM dS, yyyy HH:mm');
-		} else {
-			dateString = Date.parse(date).toString('MMM dS HH:mm');
+	let now = new Date();
+	let diff = date - now;
+
+	let year = date.getFullYear(),
+		month = date.getMonth(),
+		day = date.getDate(),
+		dayOfWeek = date.getDay(),
+		hours = date.getHours(),
+		minutes = date.getMinutes(),
+		//seconds = date.getSeconds(),
+		monthString = months[month].short,
+		dowString = daysOfWeek[dayOfWeek].name;
+
+	// Less than a day
+	if (diff <= 24 * 60 * 60 * 1000) {
+		let diffHours = Math.floor(diff / (1000 * 60 * 60));
+		let diffMinutes = Math.floor(diff / (1000 * 60) - 60 * diffHours);
+		// Less than an hour
+		if (diff <= 60 * 60 * 1000) {
+			let diffSecs = Math.floor(diff / 1000 - 60 * diffMinutes);
+			// Less than a minute
+			if (diff <= 60 * 1000) return `In ${diffSecs} second${diffSecs !== 1 ? 's' : ''}`;
+			return `In ${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ${diffSecs > 0 ? diffSecs + ' second' + (diffSecs !== 1 ? 's' : '') : ''}`
 		}
-	} else {
-		dateString = Date.parse(date).toString('HH:mm');
+		return `In ${diffHours} hour${diffHours !== 1 ? 's' : ''} ${diffMinutes > 0 ? diffMinutes + ' minute' + (diffMinutes !== 1 ? 's' : '') : ''}`
 	}
-	return dateString;
+
+	// Not this year
+	if (now.getFullYear() !== date.getFullYear()) {
+		return `${dowString}, ${monthString}. ${getNumberWithOrdinal(day)} ${year} ${hours.pad(2)}:${minutes.pad(2)}`;
+	}
+
+	// Today
+	if (now.getDate() === date.getDate() && now.getMonth() === date.getMonth()) {
+		return `${hours.pad(2)}:${minutes.pad(2)}`;
+	}
+
+	// This year but not today
+	return `${dowString}, ${monthString}. ${getNumberWithOrdinal(day)} ${hours.pad(2)}:${minutes.pad(2)}`;
 }
 
 /**
@@ -606,7 +670,8 @@ async function notifyOldReminders(collection) {
 		let tempText = 'I wasn\'t able to remind you of these messages:\n';
 		for (const reminderEntry of oldReminders) {
 			let reminder = reminderEntry[1];
-			tempText += '[' + parseDate(reminder.date);
+			let realDate = new Date(reminder.date);
+			tempText += '[' + parseDate(realDate);
 			if (reminder.task != null) {
 				tempText += ' - ' + reminder.task;
 			}
