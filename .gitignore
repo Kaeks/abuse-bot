@@ -6,10 +6,7 @@ package-lock.json
 package.json
 
 #storage files
-data.json
-blocked_users.json
-deleted_messages.json
-edited_messages.json
+storage/
 dumps/
 
 #config file containing secret bot token

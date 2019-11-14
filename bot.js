@@ -27,6 +27,14 @@ for (const file of commandFiles) {
 	client.commands.set(command.name, command);
 }
 
+// BAD WORDS
+let badWordsText = fs.readFileSync('./storage/badwords.txt', 'utf-8');
+let badWords = badWordsText.split('\r\n');
+
+let specialChars = '[ ^°"$%&/()=?{}\\[\\]\\\\`´*+~#\'\\-_.:,;<>|]';
+let joinedBadWords = badWords.join('|');
+let badWordsRegExp = new RegExp('(?:^|' + specialChars + ')(' + joinedBadWords + ')(?:$|' + specialChars + ')');
+
 //// EVENTS
 // START
 client.on('ready', () => {
@@ -95,6 +103,10 @@ client.on('message', msg => {
 		} else {
 			if (eatAss)	{
 				msg.channel.send('Hey, ' + msg.author + ', that\'s not very nice of you!');
+			} else if (Config.badWordFilter === true) {
+				if (msg.content.match(badWordsRegExp)) {
+					msg.channel.send('Whoa there buddy. You said a nasty word, ' + msg.author + '!')
+				}
 			}
 		}
 	}

@@ -1,6 +1,13 @@
 const fs = require('fs');
 const { Discord, client } = require('./bot.js');
 
+//// AMENDS
+Number.prototype.pad = function(size) {
+	let s = String(this);
+	while (s.length < (size || 2)) s = '0' + s;
+	return s;
+};
+
 // AMENDS TO DISCORD.JS LIBRARY
 /**
  * Returns the DM Channel of a user. Creates one if it does not exist.
@@ -40,10 +47,10 @@ Discord.Collection.prototype.simplify = function () {
 
 // CONSTANTS
 const CONFIG_PATH = './config.json';
-const DATA_PATH = './data.json';
-const BLOCKED_PATH = './blocked_users.json';
-const DELETED_PATH = './deleted_messages.json';
-const EDITED_PATH = './edited_messages.json';
+const DATA_PATH = './storage/data.json';
+const BLOCKED_PATH = './storage/blocked_users.json';
+const DELETED_PATH = './storage/deleted_messages.json';
+const EDITED_PATH = './storage/edited_messages.json';
 
 // SHARED VARS
 let waterTimers = {};
@@ -51,11 +58,6 @@ let runningWaterTimers = {};
 
 let reminders = new Discord.Collection();
 let runningReminders = new Discord.Collection();
-
-/*runningReminders['reminderId'] = {
-	timer : setTimeout(),
-	users : [],
-};*/
 
 // DATA VARS
 let Config = {};
@@ -73,8 +75,10 @@ Edited = loadFile(EDITED_PATH, Edited);
 
 // SET DEFAULT VALUES
 Config.prefix = Config.prefix || '!';
-Config.token = Config.token || '';
+Config.token = Config.token || null;
 Config.debug = Config.debug !== undefined ? Config.debug : false;
+Config.ownerId = Config.ownerId || null;
+Config.badWordFilter = Config.badWordFilter || false;
 
 Storage.servers = Storage.servers || {};
 Storage.users = Storage.users || {};
@@ -87,21 +91,30 @@ saveFile(BLOCKED_PATH, Blocked);
 saveFile(DELETED_PATH, Deleted);
 saveFile(EDITED_PATH, Edited);
 
+// CHECK REQUIRED VALUES AND EXIT IF NECESSARY
+let canRunBot = true;
+
+if (Config.token === null) {
+	warn('Property \'token\' missing in config.json!');
+	canRunBot = false;
+}
+if (Config.ownerId === null) {
+	warn(
+		'Property \'ownerId\' missing in config.json! Please fill in the ID of your discord user.' + '\n' +
+		'Without an ownerId it is not possible to perform actions that require a bot superuser.'
+	);
+}
+
+if (!canRunBot) process.exit(1);
+
 // ENUM
 /**
- *	'args' property for commands:
- *	NULL:		command doesn't have its own execute function
- *				'' 		❌
- *				'foo'	❌
- *	NONE: 		arguments are NOT ACCEPTED
- *				'' 		✔
- *				'foo'	❌
- *	OPTIONAL: 	arguments are OPTIONAL
- *				'' 		✔
- *				'foo'	✔
- *	REQUIRED: 	arguments are REQUIRED
- *				'' 		❌
- *				'foo'	✔
+ * VALUE    | ''  | 'foo'
+ * ---------+-----+------
+ * NULL     | ❌  |  ❌
+ * NONE     | ✔  |  ❌
+ * OPTIONAL | ✔  |  ✔
+ * REQUIRED | ❌  |  ✔
  *
  *	⚠ THIS DOES NOT INCLUDE SUB-COMMANDS ⚠
  *	* A command with only sub-commands but no standalone function is NONE
@@ -207,6 +220,10 @@ function loadFile(filePath, variable) {
 	} catch (e) {
 		saveFile(filePath, variable);
 		info('Created ' + filePath);
+		if (filePath === CONFIG_PATH) {
+			info('Please configure the bot with your credentials inside ' + CONFIG_PATH + '.');
+			process.exit(1);
+		}
 	}
 	return temp || variable;
 }
@@ -305,7 +322,7 @@ function combineCommandChain(commandChain) {
  * @param {String} description
  * @returns {string}
  */
-function getHelpRow(commandString, usage, description) {
+function getHelpRow(commandString, usage, description = undefined) {
 	let base = '`' + Config.prefix + commandString + ' ' + usage + '`' + '\n';
 	return description === undefined ? base : base + '-- ' + description + '\n';
 }
@@ -677,7 +694,7 @@ async function sendReminder(id, user) {
 	let task = reminder.task;
 	let userAmt = reminder.users.length - 1;
 	let tempText = 'I\'m here to remind you about [this message](<' + msgLink + '>).';
-	if (task != null) tempText += '\nThe task was:\n> ' + task;
+	if (task.length > 0) tempText += '\nThe task was:\n> ' + task;
 	let embed = new Discord.RichEmbed()
 		.setColor(colors.GREEN)
 		.setTitle('Reminder!')
