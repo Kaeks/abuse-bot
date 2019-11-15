@@ -1,9 +1,12 @@
 //// SETUP
-// IMPORTS
+// GLOBAL IMPORTS
 const CronJob = require('cron').CronJob;
 const Discord = require('discord.js');
 const client = new Discord.Client();
 const chrono = require('chrono-node');
+const argumentValues = require('./enum/ArgumentValueEnum.js');
+const colors = require('./enum/EmbedColorEnum.js');
+const reactionEvents = require('./enum/ReactionEventEnum.js');
 
 /// EXPORTS
 module.exports = {
@@ -182,34 +185,38 @@ client.on('messageUpdate', (oldMessage, newMessage) => {
 });
 
 function getReminderFromMessage(msg) {
-	let reminders = common.getReminders();
+	let reminders = common.reminders;
 	for (let reminderEntry of reminders) {
 		let reminder = reminderEntry[1];
-		if (msg.id === reminder.botMsg) return reminder;
+		if (msg.id === reminder.botMsg.id) return reminder;
 	}
 	return undefined;
 }
 
+function handleReaction(messageReaction, user, event) {
+	if (user.bot) return false;
+	let message = messageReaction.message;
+
+	let listeners = common.reactionListeners;
+	listeners.forEach(listener => {
+		// Check if the message is being listened to and the reaction is accepted
+		if (message.id === listener.msgId) {
+			console.log(listener.reactions);
+			if (listener.reactions.indexOf(messageReaction.emoji.name) > -1) {
+				listener.fn(messageReaction, user, event);
+			}
+		}
+	});
+}
+
 // REACTION ADDED TO MESSAGE
 client.on('messageReactionAdd', (messageReaction, user) => {
-	let message = messageReaction.message;
-	// Only handle reactions on the bot's messages
-	if (message.author !== client.user) return false;
-
-	if (messageReaction.emoji.name === '🙋') {
-		if (!user.bot) common.joinReminder(user, getReminderFromMessage(message).id);
-	}
+	handleReaction(messageReaction, user, reactionEvents.ADD);
 });
 
 // REACTION REMOVED FROM MESSAGE
 client.on('messageReactionRemove', ((messageReaction, user) => {
-	let message = messageReaction.message;
-	// Only handle reactions on the bot's messages
-	if (message.author !== client.user) return false;
-
-	if (messageReaction.emoji.name === '🙋') {
-		if (!user.bot) common.leaveReminder(user, getReminderFromMessage(message).id);
-	}
+	handleReaction(messageReaction, user, reactionEvents.REMOVE);
 }));
 
 // ADDED TO SERVER
@@ -304,7 +311,7 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 		// Suffix is empty
 		// Command doesn't require arguments ✔
 		// Command doesn't have a standalone function ✔
-		if (![common.argumentValues.REQUIRED, common.argumentValues.NULL].includes(command.args)) isValidUse = true;
+		if (![argumentValues.REQUIRED, argumentValues.NULL].includes(command.args)) isValidUse = true;
 	} else {
 		// Suffix is not empty
 		// Get a list individual (possible) sub-commands
@@ -332,7 +339,7 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 
 			let newSuffix = match !== null ? temp.substring(match[0].length) : null;
 			return findSubCommand(msg, newSuffix, command.sub[subIndex], localCommandChain);
-		} else if (command.args === common.argumentValues.REQUIRED || command.args === common.argumentValues.OPTIONAL) {
+		} else if (command.args === argumentValues.REQUIRED || command.args === argumentValues.OPTIONAL) {
 			isValidUse = true;
 		}
 	}
@@ -348,7 +355,7 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 		} else {
 			common.warn('Command \'' + commandString + '\' has not been implemented.');
 			let embed = new Discord.RichEmbed()
-				.setColor(common.colors.RED)
+				.setColor(colors.RED)
 				.setTitle('Not available!')
 				.setDescription('The command `' + Config.prefix + commandString + '` doesn\'t have an implemented function.');
 			msg.channel.send({ embed: embed });
@@ -356,7 +363,7 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 		}
 	} else {
 		let embed = new Discord.RichEmbed()
-			.setColor(common.colors.GREEN)
+			.setColor(colors.GREEN)
 			.setTitle('Help for ' + commandString)
 			.setDescription(common.getCommandHelp(command, commandChain));
 		msg.channel.send({ embed: embed });
@@ -430,7 +437,7 @@ function handleCommand(msg) {
 	} catch (e) {
 		console.error(e.stack);
 		let embed = new Discord.RichEmbed()
-			.setColor(common.colors.RED)
+			.setColor(colors.RED)
 			.setTitle('Internal Error!')
 			.setDescription('Command `' + commandName + '` failed.');
 		msg.channel.send({ embed: embed });

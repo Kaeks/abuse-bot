@@ -5,17 +5,19 @@ const {
 	waterTimers, runningWaterTimers,
 	addWaterTimer, stopWaterTimer, updateWaterTimer, getWaterTimerStatus
 } = common;
+const argumentValues = require('../enum/ArgumentValueEnum.js');
+const colors = require('../enum/EmbedColorEnum.js');
 
 // Default water interval (in minutes) to be set when people join the water club
 const DEFAULT_WATER_INTERVAL = 60;
 
 module.exports = {
 	name : 'water',
-	args : common.argumentValues.NULL,
+	args : argumentValues.NULL,
 	sub : [
 		{
 			name : 'status',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage : '',
 			description : 'Display your current water status.',
 			execute(msg) {
@@ -30,7 +32,7 @@ module.exports = {
 				let newSeconds = seconds - minutes * 60;
 				let string = minutes + ' minutes, ' + newSeconds + ' seconds';
 				let embed = new Discord.RichEmbed()
-					.setColor(common.colors.GREEN)
+					.setColor(colors.GREEN)
 					.setTitle('Next reminder!')
 					.setDescription('Your next reminder will be issued in ' + string + '.');
 				msg.channel.send({ embed: embed });
@@ -38,7 +40,7 @@ module.exports = {
 		},
 		{
 			name : 'join',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage : '',
 			description : 'Join the water club.',
 			execute(msg) {
@@ -48,7 +50,7 @@ module.exports = {
 				storageUser.water = storageUser.water || {};
 				let embed = new Discord.RichEmbed();
 				if (isWaterMember(user)) {
-					embed.setColor(common.colors.RED)
+					embed.setColor(colors.RED)
 						.setTitle('Already a HydroHomie!')
 						.setDescription('You are already a member of the water club!');
 					msg.channel.send({ embed: embed });
@@ -57,7 +59,7 @@ module.exports = {
 				storageUser.water.enabled = true;
 				storageUser.water.interval = storageUser.water.interval || DEFAULT_WATER_INTERVAL;
 				saveData();
-				embed.setColor(common.colors.GREEN)
+				embed.setColor(colors.GREEN)
 					.setTitle('Welcome!')
 					.setDescription(
 						'You are now a HydroHomie, ' + user + '!' +
@@ -69,7 +71,7 @@ module.exports = {
 		},
 		{
 			name : 'leave',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage : '',
 			description : 'Leave the water club.',
 			execute(msg) {
@@ -82,7 +84,7 @@ module.exports = {
 				saveData();
 				stopWaterTimer(user);
 				let embed = new Discord.RichEmbed()
-					.setColor(common.colors.GREEN)
+					.setColor(colors.GREEN)
 					.setTitle('No longer a HydroHomie')
 					.setDescription('You have left the water club. Sad to see you go! :(');
 				msg.channel.send({ embed: embed });
@@ -90,11 +92,11 @@ module.exports = {
 		},
 		{
 			name : 'interval',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			sub : [
 				{
 					name : 'set',
-					args : common.argumentValues.REQUIRED,
+					args : argumentValues.REQUIRED,
 					usage : '<interval>',
 					description : 'Set a new interval (in minutes)',
 					execute(msg, suffix) {
@@ -117,13 +119,13 @@ module.exports = {
 								common.debug(runningWaterTimers);
 
 								let embed = new Discord.RichEmbed()
-									.setColor(common.colors.GREEN)
+									.setColor(colors.GREEN)
 									.setTitle('Water interval updated!')
 									.setDescription('Water interval has been set to ' + newInterval + ' minutes.');
 								msg.channel.send({ embed: embed });
 							} else {
 								let embed = new Discord.RichEmbed()
-									.setColor(common.colors.RED)
+									.setColor(colors.RED)
 									.setTitle('0 or below!')
 									.setDescription('<interval> must be above 0.');
 								msg.channel.send({ embed: embed })
@@ -131,7 +133,7 @@ module.exports = {
 							}
 						} else {
 							let embed = new Discord.RichEmbed()
-								.setColor(common.colors.RED)
+								.setColor(colors.RED)
 								.setTitle('Not a number!')
 								.setDescription('<interval> must be an integer.');
 							msg.channel.send({ embed: embed })
@@ -150,7 +152,7 @@ module.exports = {
 				}
 				let userInterval = Storage.users[user.id].water.interval;
 				let embed = new Discord.RichEmbed()
-					.setColor(common.colors.GREEN)
+					.setColor(colors.GREEN)
 					.setTitle('Water interval.')
 					.setDescription('Your interval is set to ' + userInterval + ' minutes.');
 				msg.channel.send({ embed: embed });
@@ -158,11 +160,11 @@ module.exports = {
 		},
 		{
 			name : 'ignorednd',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			sub : [
 				{
 					name : 'set',
-					args : common.argumentValues.REQUIRED,
+					args : argumentValues.REQUIRED,
 					usage : [ '<true|false>' ],
 					description : [ 'Set whether or not I should ignore your DnD status and send you water reminders regardless.' ],
 					execute(msg, suffix) {
@@ -176,7 +178,7 @@ module.exports = {
 						Storage.users[user.id].water.ignoreDnD = boolValue;
 						saveData();
 						let embed = new Discord.RichEmbed()
-							.setColor(common.colors.GREEN)
+							.setColor(colors.GREEN)
 							.setTitle('Now ' + (boolValue ? 'ignoring' : 'respecting') + ' DnD!')
 							.setDescription('I am going to ' + (boolValue ? 'ignore' : 'respect') + ' your DnD status from now on.');
 						msg.channel.send({ embed: embed });
@@ -193,7 +195,7 @@ module.exports = {
 				}
 				let ignoring = Storage.users[user.id].water.ignoreDnd;
 				let embed = new Discord.RichEmbed()
-					.setColor(common.colors.GREEN)
+					.setColor(colors.GREEN)
 					.setTitle((ignoring ? 'Ignoring' : 'Respecting') + ' DnD!')
 					.setDescription('I am currently ' + (ignoring ? 'ignoring' : 'respecting') + ' your DnD status.');
 				msg.channel.send({ embed: embed });
@@ -213,7 +215,7 @@ function isWaterMember(user) {
 function sendNotInWaterClub(msg) {
 	if (!isWaterMember(msg.author)) {
 		let embed = new Discord.RichEmbed()
-			.setColor(common.colors.RED)
+			.setColor(colors.RED)
 			.setTitle('Not a HydroHomie!')
 			.setDescription('That command is only available for members of the water club.');
 		msg.channel.send({ embed: embed })

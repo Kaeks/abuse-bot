@@ -1,15 +1,17 @@
 const common = require('../common.js');
 const { Discord } = common;
+const argumentValues = require('../enum/ArgumentValueEnum.js');
+const colors = require('../enum/EmbedColorEnum.js');
 
 module.exports = {
 	name : 'spam',
-	args : common.argumentValues.REQUIRED,
+	args : argumentValues.REQUIRED,
 	usage : '<user>',
 	description : 'Spam <user>\'s DMs.',
 	execute(msg) {
 		if (msg.channel.type === 'dm') {
 			let embed = new Discord.RichEmbed()
-				.setColor(common.colors.RED)
+				.setColor(colors.RED)
 				.setTitle('Not available!')
 				.setDescription('Spamming is not available in DMs.');
 			msg.channel.send({ embed: embed })
@@ -18,7 +20,7 @@ module.exports = {
 		}
 		if (msg.mentions.users.size > 0) {
 			let embed = new Discord.RichEmbed()
-				.setColor(0x000AE86)
+				.setColor(colors.PRESTIGE)
 				.setAuthor(msg.author.username, msg.author.displayAvatarURL)
 				.setImage('https://cdn.vox-cdn.com/thumbor/' +
 					'UO1hhAGb7ea5G-MuC43l1Sxx9Rw=/0x0:2282x1712/1200x675/' +

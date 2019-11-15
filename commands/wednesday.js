@@ -4,23 +4,25 @@ const {
 	Storage, saveData,
 	sendWednesday
 } = common;
+const argumentValues = require('../enum/ArgumentValueEnum.js');
+const colors = require('../enum/EmbedColorEnum.js');
 
 module.exports = {
 	name : 'wednesday',
-	args : common.argumentValues.NONE,
+	args : argumentValues.NONE,
 	sub : [
 		{
 			name : 'enable',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage : '',
 			description : 'Enable Wednesday posting.',
 			execute (msg) {
 				if (checkDmOrGroup(msg)) return false;
-				let server = msg.guild.id;
-				Storage.servers[server].disabledFeatures.wednesday = false;
+				let server = msg.guild;
+				Storage.servers[server.id].disabledFeatures.wednesday = false;
 				saveData();
 				let embed = new Discord.RichEmbed()
-					.setColor(common.colors.GREEN)
+					.setColor(colors.GREEN)
 					.setTitle('Wednesday posting enabled!')
 					.setDescription('The wednesdaily frog has been enabled. :frog:');
 				msg.channel.send({ embed: embed });
@@ -28,16 +30,16 @@ module.exports = {
 		},
 		{
 			name : 'disable',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage : '',
 			description : 'Enable/disable Wednesday posting.',
 			execute (msg) {
 				if (checkDmOrGroup(msg)) return false;
-				let server = msg.guild.id;
-				Storage.servers[server].disabledFeatures.wednesday = true;
+				let server = msg.guild;
+				Storage.servers[server.id].disabledFeatures.wednesday = true;
 				saveData();
 				let embed = new Discord.RichEmbed()
-					.setColor(common.colors.GREEN)
+					.setColor(colors.GREEN)
 					.setTitle('Wednesday posting disabled!')
 					.setDescription('The wednesdaily frog has been disabled. <:tairaOOF:455716045987250186>');
 				msg.channel.send({ embed: embed });
@@ -45,27 +47,27 @@ module.exports = {
 		},
 		{
 			name : 'channel',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			sub : [
 				{
 					name : 'set',
-					args : common.argumentValues.OPTIONAL,
+					args : argumentValues.OPTIONAL,
 					usage : '[textChannel]',
 					description : 'Set channel for Wednesdays.',
 					execute (msg, suffix) {
 						if (checkDmOrGroup(msg)) return false;
-						let server = msg.guild.id;
+						let server = msg.guild;
 						let channel;
 						if (suffix == null) {
 							channel = msg.channel;
 						} else {
 							channel = msg.mentions.channels.first();
 						}
-						Storage.servers[server].channels = Storage.servers[server].channels || {};
-						Storage.servers[server].channels.wednesday = channel.id;
+						Storage.servers[server.id].channels = Storage.servers[server.id].channels || {};
+						Storage.servers[server.id].channels.wednesday = channel.id;
 						saveData();
 						let embed = new Discord.RichEmbed()
-							.setColor(common.colors.GREEN)
+							.setColor(colors.GREEN)
 							.setTitle('Wednesday channel set!')
 							.setDescription('The channel for Wednesdays has been set to ' + channel);
 						msg.channel.send({ embed: embed });
@@ -76,11 +78,11 @@ module.exports = {
 			description : 'View channel for Wednesdays.',
 			execute (msg) {
 				if (checkDmOrGroup(msg)) return false;
-				let server = msg.guild.id;
-				let channelID = Storage.servers[server].channels.wednesday;
-				let channel = msg.client.channels.get(channelID);
+				let server = msg.guild;
+				let channelEntry = Storage.servers[server.id].channels.wednesday;
+				let channel = msg.client.channels.get(channelEntry);
 				let embed = new Discord.RichEmbed()
-					.setColor(common.colors.GREEN)
+					.setColor(colors.GREEN)
 					.setTitle('Current wednesday channel')
 					.setDescription('The channel for Wednesdays currently is ' + channel);
 				msg.channel.send({ embed: embed });
@@ -88,14 +90,14 @@ module.exports = {
 		},
 		{
 			name : 'subscribe',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage : '',
 			description : 'Subscribe to the private Wednesday service.',
 			execute (msg) {
 				let user = msg.author;
 				if (isSubscribed(user)) {
 					let embed = new Discord.RichEmbed()
-						.setColor(common.colors.GREEN)
+						.setColor(colors.GREEN)
 						.setTitle('Already subscribed!')
 						.setDescription('You are already subscribed to the private Wednesday service ' + user + '.');
 					msg.channel.send({ embed: embed });
@@ -103,7 +105,7 @@ module.exports = {
 					Storage.users[user.id].wednesday = true;
 					saveData();
 					let embed = new Discord.RichEmbed()
-						.setColor(common.colors.GREEN)
+						.setColor(colors.GREEN)
 						.setTitle('Subscribed!')
 						.setDescription('You are now subscribed to the private Wednesday service, ' + user + '!');
 					msg.channel.send({ embed: embed });
@@ -112,7 +114,7 @@ module.exports = {
 		},
 		{
 			name : 'unsubscribe',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage : '',
 			description : 'Unsubscribe from the private Wednesday service.',
 			execute (msg) {
@@ -121,13 +123,13 @@ module.exports = {
 					Storage.users[user.id].wednesday = false;
 					saveData();
 					let embed = new Discord.RichEmbed()
-						.setColor(common.colors.GREEN)
+						.setColor(colors.GREEN)
 						.setTitle('Unsubscribed!')
 						.setDescription('You are no longer subscribed to the private Wednesday service ' + user + '!');
 					msg.channel.send({ embed: embed });
 				} else {
 					let embed = new Discord.RichEmbed()
-						.setColor(common.colors.GREEN)
+						.setColor(colors.GREEN)
 						.setTitle('Not subscribed!')
 						.setDescription('You are not subscribed to the private Wednesday service ' + user + '!');
 					msg.channel.send({ embed: embed });
@@ -136,7 +138,7 @@ module.exports = {
 		},
 		{
 			name : 'test',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage : '',
 			description : 'Simulate a Wednesday.',
 			async execute (msg) {
@@ -146,7 +148,7 @@ module.exports = {
 						sendWednesday(await user.getDmChannel());
 					} else {
 						let embed = new Discord.RichEmbed()
-							.setColor(common.colors.GREEN)
+							.setColor(colors.GREEN)
 							.setTitle('Not subscribed!')
 							.setDescription('You need to subscribe to the Wednesday frog service first.');
 						msg.channel.send({ embed: embed });
@@ -161,14 +163,14 @@ module.exports = {
 							sendWednesday(channel);
 						} else {
 							let embed = new Discord.RichEmbed()
-								.setColor(common.colors.GREEN)
+								.setColor(colors.GREEN)
 								.setTitle('Not enabled!')
 								.setDescription('This server has disabled the Wednesday frog service.');
 							msg.channel.send({ embed: embed });
 						}
 					} else {
 						let embed = new Discord.RichEmbed()
-							.setColor(common.colors.GREEN)
+							.setColor(colors.GREEN)
 							.setTitle('No channel set!')
 							.setDescription('This server doesn\'t have a channel for the Wednesday frog to be sent to.');
 						msg.channel.send({ embed: embed });
@@ -179,13 +181,7 @@ module.exports = {
 	],
 	usage : '',
 	description : 'It is Wednesday, my dudes.',
-	execute(msg) {
-		let embed = new Discord.RichEmbed()
-			.setColor(common.colors.GREEN)
-			.setTitle('It is Wednesday, my dudes.')
-			.setImage('https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg');
-		msg.channel.send({ embed: embed });
-	}
+	execute(msg) { sendWednesday(msg.channel); }
 };
 
 /**
@@ -211,7 +207,7 @@ function checkDmOrGroup(msg) {
 	let statement = (msg.channel.type === 'dm' || msg.channel.type === 'group');
 	if (statement) {
 		let embed = new Discord.RichEmbed()
-			.setColor(common.colors.RED)
+			.setColor(colors.RED)
 			.setTitle('Not available!')
 			.setDescription('That command is not available in (group) DMs.');
 		msg.channel.send({ embed: embed })

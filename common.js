@@ -18,6 +18,11 @@ Discord.User.prototype.getDmChannel = async function() {
 	return this.dmChannel != null ? this.dmChannel : await this.createDM();
 };
 
+/**
+ * Sends a DM to a user without having to check for a DM channel first.
+ * @param data
+ * @returns {Promise<*>}
+ */
 Discord.User.prototype.sendDm = async function(data) {
 	let channel = await this.getDmChannel();
 	return channel.send(data);
@@ -51,13 +56,9 @@ const DATA_PATH = './storage/data.json';
 const BLOCKED_PATH = './storage/blocked_users.json';
 const DELETED_PATH = './storage/deleted_messages.json';
 const EDITED_PATH = './storage/edited_messages.json';
+const REMINDER_PATH = './storage/reminders.json';
 
-// SHARED VARS
-let waterTimers = {};
-let runningWaterTimers = {};
-
-let reminders = new Discord.Collection();
-let runningReminders = new Discord.Collection();
+const REMINDER_SIGNUP_EMOJI = '🙋';
 
 // DATA VARS
 let Config = {};
@@ -65,6 +66,7 @@ let Storage = {};
 let Blocked = [];
 let Deleted = [];
 let Edited = [];
+let Reminders = [];
 
 // LOAD FILES
 Config = loadFile(CONFIG_PATH, Config);
@@ -72,6 +74,7 @@ Storage = loadFile(DATA_PATH, Storage);
 Blocked = loadFile(BLOCKED_PATH, Blocked);
 Deleted = loadFile(DELETED_PATH, Deleted);
 Edited = loadFile(EDITED_PATH, Edited);
+Reminders = loadFile(REMINDER_PATH, Reminders);
 
 // SET DEFAULT VALUES
 Config.prefix = Config.prefix || '!';
@@ -82,7 +85,6 @@ Config.badWordFilter = Config.badWordFilter || false;
 
 Storage.servers = Storage.servers || {};
 Storage.users = Storage.users || {};
-Storage.reminders = Storage.reminders || [];
 
 // SAVE FILES WITH POTENTIALLY UPDATED DATA
 saveFile(CONFIG_PATH, Config);
@@ -90,6 +92,7 @@ saveFile(DATA_PATH, Storage);
 saveFile(BLOCKED_PATH, Blocked);
 saveFile(DELETED_PATH, Deleted);
 saveFile(EDITED_PATH, Edited);
+saveFile(REMINDER_PATH, Reminders);
 
 // CHECK REQUIRED VALUES AND EXIT IF NECESSARY
 let canRunBot = true;
@@ -107,70 +110,28 @@ if (Config.ownerId === null) {
 
 if (!canRunBot) process.exit(1);
 
+// SHARED VARS
+let waterTimers = {};
+let runningWaterTimers = {};
+
+let reminders = new Discord.Collection(Reminders);
+let runningReminders = new Discord.Collection();
+
+let reactionListeners = new Discord.Collection();
+
 // ENUM
-/**
- * VALUE    | ''  | 'foo'
- * ---------+-----+------
- * NULL     | ❌  |  ❌
- * NONE     | ✔  |  ❌
- * OPTIONAL | ✔  |  ✔
- * REQUIRED | ❌  |  ✔
- *
- *	⚠ THIS DOES NOT INCLUDE SUB-COMMANDS ⚠
- *	* A command with only sub-commands but no standalone function is NONE
- *	* A command with sub-commands and a standalone function can be OPTIONAL or REQUIRED,
- *	  depending on whether the standalone function CAN or MUST receive an argument.
- *
- * @type {{OPTIONAL: number, NULL: number, REQUIRED: number, NONE: number}}
- */
-let argumentValues = {
-	NULL : -1,
-	NONE : 0,
-	OPTIONAL : 1,
-	REQUIRED : 2
-};
-
-let colors = {
-	GREEN : 0x00AE86,
-	RED : 0xAE0028,
-	PURPLE : 0x8600AE,
-	BLURPLE : 0x7289DA,
-	PRESTIGE : 0xFBC100
-};
-
-let daysOfWeek = {
-	0	:	{name : 'Sunday',	short : 'Sun'},
-	1	:	{name : 'Monday',	short : 'Mon'},
-	2	:	{name : 'Tuesday',	short : 'Tue'},
-	3	:	{name :	'Wednesday',short : 'Wed'},
-	4	:	{name : 'Thursday',	short : 'Thu'},
-	5	:	{name : 'Friday',	short : 'Fri'},
-	6	:	{name : 'Saturday',	short : 'Sat'}
-};
-
-let months = {
-	0	:	{name : 'January',	short : 'Jan'},
-	1	:	{name : 'February',	short : 'Feb'},
-	2	:	{name : 'March',	short : 'Mar'},
-	3	:	{name : 'April',	short : 'Apr'},
-	4	:	{name : 'May',		short : 'May'},
-	5	:	{name : 'June',		short : 'Jun'},
-	6	:	{name : 'July',		short : 'Jul'},
-	7	:	{name : 'August',	short : 'Aug'},
-	8	:	{name : 'September',short : 'Sep'},
-	9	:	{name : 'October',	short : 'Oct'},
-	10	:	{name : 'November',	short : 'Nov'},
-	11	:	{name : 'December',	short : 'Dec'}
-};
+const colors = require('./enum/EmbedColorEnum.js');
+const months = require('./enum/MonthEnum.js');
+const daysOfWeek = require('./enum/WeekDayEnum.js');
+const reactionEvents = require('./enum/ReactionEventEnum.js');
 
 //// EXPORTS
 module.exports = {
 	Discord, fs, chrono,
 	client,
-	Config, Storage, Blocked, Deleted, Edited,
+	Config, Storage, Blocked, Deleted, Edited, Reminders,
 	loadFile, saveFile,
 	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited,
-	argumentValues, colors,
 	debug, log, info, warn,
 	updatePresence,
 	parseDate,
@@ -179,9 +140,10 @@ module.exports = {
 	getHelpRow, getCommandHelp, getFullHelpEmbed,
 	waterTimers, runningWaterTimers,
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
-	reminders, runningReminders, getReminders, getRemindersOfUser,
+	reminders, runningReminders, getRemindersOfUser,
 	addReminder, loadReminders, startReminder, stopReminder, startAllReminders, filterReminders, leaveAllReminders, joinReminder, leaveReminder,
-	getBooleanValue, getUsers, getTimeZone, testBooleanValue
+	getBooleanValue, getUsers, getTimeZone, testBooleanValue,
+	reactionListeners, addReactionListener, REMINDER_SIGNUP_EMOJI
 };
 
 //// METHODS
@@ -268,6 +230,7 @@ function saveData() 	{saveFile(DATA_PATH, 	Storage);	}
 function saveBlocked()	{saveFile(BLOCKED_PATH, Blocked);	}
 function saveDeleted() 	{saveFile(DELETED_PATH, Deleted);	}
 function saveEdited() 	{saveFile(EDITED_PATH, 	Edited);	}
+function saveReminders(){saveFile(REMINDER_PATH, Array.from(reminders));}
 
 // HELPERS
 /**
@@ -627,33 +590,47 @@ function runReminderTimer(id, started = new Date()) {
  * @param {Date} date
  * @param {String} task
  * @param {Message} botMsg
+ * @return {Snowflake} reminderId
  */
 function addReminder(msg, date, task, botMsg) {
 	let msgLink = msg.getLink();
 	let id = Discord.SnowflakeUtil.generate();
 	let reminder = {
 		id : id,
-		'users' : [
+		users : [
 			msg.author.id
 		],
-		'userMsg' : msg.id,
-		'botMsg' : botMsg.id,
-		'date' : date,
-		'msgLink' : msgLink,
-		'task' : task
+		userMsg : {
+			id : msg.id,
+			channel : {
+				id : msg.channel.id,
+				type : msg.channel.type
+			}
+		},
+		botMsg : {
+			id : botMsg.id,
+			channel : {
+				id : botMsg.channel.id,
+				type : botMsg.channel.id
+			}
+		},
+		date : date,
+		msgLink : msgLink,
+		task : task
 	};
 	reminders.set(id, reminder);
 	saveReminders();
 	debug('Added reminder with id ' + id + ':');
 	debug(reminder);
 	startReminder(id);
+	return id;
 }
 
 /**
  * Loads all reminders into cache
  */
 function loadReminders() {
-	reminders = new Discord.Collection(Storage.reminders);
+	reminders = new Discord.Collection(Reminders);
 	debug('Loaded all reminders.');
 }
 
@@ -706,14 +683,6 @@ function filterReminders() {
 	debug(`Removed ${amt} outdated reminders.`);
 	notifyOldReminders(filtered);
 	saveReminders();
-}
-
-/**
- * Getter method for other classes
- * @returns {Discord.Collection<Discord.Snowflake, Object>}
- */
-function getReminders() {
-	return reminders;
 }
 
 /**
@@ -818,17 +787,79 @@ function deleteReminder(id) {
 	return true;
 }
 
+async function findChannelOfMsgId(id) {
+	let textChannels = client.channels.filter(channel => { return channel.type === 'text'; });
+	let groupChannels = client.channels.filter(channel => { return channel.type === 'group'; });
+	let users = getUsers();
+	let dmChannels = new Discord.Collection();
+	for (const userEntry of users) {
+		let user = userEntry[1];
+		let dmChannel = await user.getDmChannel();
+		dmChannels.set(dmChannel.id, dmChannel);
+	}
+	let channels = textChannels.concat(dmChannels, groupChannels);
+	for (const channelEntry of channels) {
+		let channel = channelEntry[1];
+		try {
+			let message = await channel.fetchMessage(id);
+			return message.channel;
+		} catch (e) {
+			console.log('nah');
+		}
+	}
+
+}
+
+async function getFixedReminderMessage(msgId) {
+	let foundChannel = await findChannelOfMsgId(msgId);
+	return {
+		id : msgId,
+		channel : {
+			id : foundChannel.id,
+			type : foundChannel.type
+		}
+	}
+}
+
+async function fixReminder(id) {
+	let reminder = reminders.get(id);
+	if (!reminder.userMsg.hasOwnProperty('channel')) {
+		reminder.userMsg = await getFixedReminderMessage(reminder.userMsg);
+	}
+	if (!reminder.botMsg.hasOwnProperty('channel')) {
+		reminder.botMsg = await getFixedReminderMessage(reminder.botMsg);
+	}
+	reminders.set(id, reminder);
+	saveReminders();
+}
+
 /**
  * Starts a reminder
  * @param {Snowflake} id
  * @returns {boolean}
  */
-function startReminder(id) {
+async function startReminder(id) {
 	if (!runReminderTimer(id)) {
 		info('Reminder with id ' + id + ' could not be started.');
 		return false;
 	}
 	debug('Started reminder with id ' + id + '.');
+
+	// migration
+	await fixReminder(id);
+
+	let reminder = reminders.get(id);
+
+	let channel = client.channels.get(reminder.botMsg.channel.id);
+	let botMsg = await channel.fetchMessage(reminder.botMsg.id);
+
+	addReactionListener(botMsg, (messageReaction, reactor, event) => {
+		if (event === reactionEvents.ADD) {
+			joinReminder(reactor, id);
+		} else if (event === reactionEvents.REMOVE) {
+			leaveReminder(reactor, id);
+		}
+	}, [ REMINDER_SIGNUP_EMOJI ]);
 }
 
 /**
@@ -848,6 +879,7 @@ function startAllReminders() {
  * @return {boolean} success
  */
 function joinReminder(user, id) {
+	if (!reminders.has(id)) return false;
 	let reminder = reminders.get(id);
 	if (reminder.users.includes(user.id)) return false;
 	reminder.users.push(user.id);
@@ -863,6 +895,7 @@ function joinReminder(user, id) {
  * @return {boolean} success
  */
 function leaveReminder(user, id) {
+	if (!reminders.has(id)) return false;
 	let reminder = reminders.get(id);
 	if (!reminder.users.includes(user.id)) return false;
 	reminder.users = reminder.users.filter(value => {
@@ -884,15 +917,6 @@ function leaveAllReminders(user) {
 		if (reminder.users.includes(user.id)) leaveReminder(user, reminder.id);
 	}
 	saveReminders();
-}
-
-/**
- * Saves reminders to storage
- */
-function saveReminders() {
-	Storage.reminders = Array.from(reminders);
-	saveData();
-	debug('Saved reminders.');
 }
 
 /**
@@ -929,8 +953,41 @@ function testBooleanValue(msg, value) {
 	return true;
 }
 
+/**
+ * Gets a collection of real users (i.e. without bot users)
+ * @returns {Collection}
+ */
 function getUsers() {
 	return client.users.filter(user => {
 		return user.bot === false
 	});
+}
+
+/**
+ * Add a reaction listener to a message with a function that triggers when a reaction from the list of reactions is added or removed
+ * @param msg
+ * @param fn
+ * @param reactions
+ */
+function addReactionListener(msg, fn, reactions = []) {
+	let id = Discord.SnowflakeUtil.generate();
+	let temp = {
+		id : id,
+		msgId : msg.id,
+		reactions : reactions,
+		fn : fn
+	};
+	reactionListeners.set(id, temp);
+	return id;
+}
+
+/**
+ * Removes a reaction listener from the list of reaction listeners
+ * @param id
+ * @returns {boolean}
+ */
+function removeReactionListener(id) {
+	if (!reactionListeners.has(id)) return false;
+	reactionListeners.delete(id);
+	return true;
 }

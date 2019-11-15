@@ -3,14 +3,15 @@ const {
 	Discord, Storage,
 	getTimeZone
 } = common;
+const argumentValues = require('../enum/ArgumentValueEnum.js');
 
 module.exports = {
 	name : 'timezone',
-	args : common.argumentValues.NONE,
+	args : argumentValues.NONE,
 	sub : [
 		{
 			name : 'set',
-			args : common.argumentValues.REQUIRED,
+			args : argumentValues.REQUIRED,
 			usage : '<timezone>',
 			description : 'Set a new time zone. (Format: +/-HHMM)',
 			execute(msg, suffix) {

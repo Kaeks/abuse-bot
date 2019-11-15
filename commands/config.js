@@ -3,14 +3,16 @@ const {
 	Discord,
 	Config, saveConfig,
 } = common;
+const argumentValues = require('../enum/ArgumentValueEnum.js');
+const colors = require('../enum/EmbedColorEnum.js');
 
 module.exports = {
 	name : 'config',
-	args : common.argumentValues.NULL,
+	args : argumentValues.NULL,
 	sub : [
 		{
 			name : 'prefix',
-			args : common.argumentValues.OPTIONAL,
+			args : argumentValues.OPTIONAL,
 			usage : [
 				'',
 				'[newPrefix]'
@@ -22,7 +24,7 @@ module.exports = {
 			execute(msg, suffix) {
 				if (suffix == null) {
 					let embed = new Discord.RichEmbed()
-						.setColor(common.colors.GREEN)
+						.setColor(colors.GREEN)
 						.setTitle('Bot prefix')
 						.setDescription('Bot prefix is currently `' + Config.prefix + '`.');
 					msg.channel.send({ embed: embed });
@@ -32,7 +34,7 @@ module.exports = {
 					saveConfig();
 					common.updatePresence();
 					let embed = new Discord.RichEmbed()
-						.setColor(common.colors.GREEN)
+						.setColor(colors.GREEN)
 						.setTitle('Bot prefix set!')
 						.setDescription('Bot prefix has been set to `' + newPrefix + '`.');
 					msg.channel.send({ embed: embed });
@@ -41,7 +43,7 @@ module.exports = {
 		},
 		{
 			name : 'debug',
-			args : common.argumentValues.OPTIONAL,
+			args : argumentValues.OPTIONAL,
 			usage : [
 				'',
 				'[true|false]'
@@ -53,7 +55,7 @@ module.exports = {
 			execute(msg, suffix) {
 				if (suffix == null) {
 					let embed = new Discord.RichEmbed()
-						.setColor(common.colors.GREEN)
+						.setColor(colors.GREEN)
 						.setTitle('Debug mode')
 						.setDescription('`debug` is set to `' + Config.debug + '`.');
 					msg.channel.send({ embed: embed });
@@ -63,7 +65,7 @@ module.exports = {
 					Config.debug = boolValue;
 					saveConfig();
 					let embed = new Discord.RichEmbed()
-						.setColor(common.colors.GREEN)
+						.setColor(colors.GREEN)
 						.setTitle('Debug mode set!')
 						.setDescription('`debug` has been set to `' + suffix + '`.');
 					msg.channel.send({ embed: embed });

@@ -1,12 +1,13 @@
 const common = require('../common.js');
+const argumentValues = require('../enum/ArgumentValueEnum.js');
 
 module.exports = {
 	name : 'example',
-	args : common.argumentValues.OPTIONAL,
+	args : argumentValues.OPTIONAL,
 	sub : [
 		{
 			name : 'a',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage : '',
 			description : 'Example sub-command that doesn\'t accept parameters.',
 			execute(msg) {
@@ -15,7 +16,7 @@ module.exports = {
 		},
 		{
 			name : 'b',
-			args : common.argumentValues.REQUIRED,
+			args : argumentValues.REQUIRED,
 			usage : '<yeet>',
 			description : 'Example sub-command with a required parameter',
 			execute(msg, suffix) {
@@ -24,11 +25,11 @@ module.exports = {
 		},
 		{
 			name : 'c',
-			args : common.argumentValues.OPTIONAL,
+			args : argumentValues.OPTIONAL,
 			sub : [
 				{
 					name : 'ca',
-					args : common.argumentValues.OPTIONAL,
+					args : argumentValues.OPTIONAL,
 					usage : '[yah]',
 					description : 'Example sub-command of a sub-command with an optional parameter',
 					execute(msg, suffix) {

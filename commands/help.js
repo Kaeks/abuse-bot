@@ -1,9 +1,11 @@
 const common = require('../common.js');
 const { Discord, Config } = common;
+const argumentValues = require('../enum/ArgumentValueEnum.js');
+const colors = require('../enum/EmbedColorEnum.js');
 
 module.exports = {
 	name : 'help',
-	args : common.argumentValues.OPTIONAL,
+	args : argumentValues.OPTIONAL,
 	usage : [
 		'',
 		'[command]'
@@ -15,7 +17,7 @@ module.exports = {
 	async execute(msg, suffix) {
 		const { commands } = msg.client;
 
-		let embed = new Discord.RichEmbed().setColor(common.colors.GREEN);
+		let embed = new Discord.RichEmbed().setColor(colors.GREEN);
 
 		if (suffix == null) {
 			embed.setTitle('Help for all commands');

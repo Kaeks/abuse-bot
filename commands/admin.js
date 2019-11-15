@@ -3,20 +3,16 @@ const {
 	Discord, fs
 } = common;
 const DUMP_DIRECTORY = 'dumps';
-const DUMP_TYPE = {
-	ALL : 'all',
-	SERVER : 'server',
-	CHANNEL : 'channel',
-	DM :'dm'
-};
+const argumentValues = require('../enum/ArgumentValueEnum.js');
+const dumpTypes = require('../enum/DumpTypeEnum.js');
 
 module.exports = {
 	name : 'admin',
-	args : common.argumentValues.NULL,
+	args : argumentValues.NULL,
 	sub : [
 		{
 			name : 'clean',
-			args : common.argumentValues.NONE,
+			args : argumentValues.NONE,
 			usage: [ '' ],
 			description : [ 'I clean up after myself.' ],
 			async execute(msg) {
@@ -33,44 +29,44 @@ module.exports = {
 		},
 		{
 			name : 'dump',
-			args : common.argumentValues.NULL,
+			args : argumentValues.NULL,
 			sub : [
 				{
 					name : 'dm',
-					args : common.argumentValues.OPTIONAL,
+					args : argumentValues.OPTIONAL,
 					usage : [ '[userId]' ],
 					description : [ 'Dumps all direct messages with a user. This user if ID is not specified.' ],
 					async execute(msg, suffix) {
-						await createDump(msg, suffix, DUMP_TYPE.DM);
+						await createDump(msg, suffix, dumpTypes.DM);
 					}
 				},
 				{
 					name : 'channel',
-					args : common.argumentValues.OPTIONAL,
+					args : argumentValues.OPTIONAL,
 					usage : [ '[id]' ],
 					description : [ 'Dumps all messages in a channel. This channel if ID is not specified.' ],
 					async execute(msg, suffix) {
 						let channel = suffix == null ? msg.channel : client.channels.get(suffix);
-						let type = channel.type === 'dm' ? DUMP_TYPE.DM : DUMP_TYPE.CHANNEL;
+						let type = channel.type === 'dm' ? dumpTypes.DM : dumpTypes.CHANNEL;
 						await createDump(msg, suffix, type);
 					}
 				},
 				{
 					name : 'server',
-					args : common.argumentValues.OPTIONAL,
+					args : argumentValues.OPTIONAL,
 					usage : [ '[id]' ],
 					description : [ 'Dumps all messages in a server. This server if ID is not specified.' ],
 					async execute(msg, suffix) {
-						await createDump(msg, suffix, DUMP_TYPE.SERVER);
+						await createDump(msg, suffix, dumpTypes.SERVER);
 					}
 				},
 				{
 					name : 'all',
-					args : common.argumentValues.NONE,
+					args : argumentValues.NONE,
 					usage : [ '' ],
 					description : [ 'Dumps all messages.' ],
 					async execute(msg, suffix) {
-						await createDump(msg, suffix, DUMP_TYPE.ALL)
+						await createDump(msg, suffix, dumpTypes.ALL)
 					}
 				}
 			]
@@ -79,24 +75,24 @@ module.exports = {
 };
 
 async function createDump(msg, suffix, type) {
-	if (Object.values(DUMP_TYPE).indexOf(type) === -1) throw `Invalid type ${type}.`;
+	if (Object.values(dumpTypes).indexOf(type) === -1) throw `Invalid type ${type}.`;
 	let client = msg.client;
-	if (type === DUMP_TYPE.DM) {
+	if (type === dumpTypes.DM) {
 		let user = suffix == null ? msg.author : client.users.get(suffix);
 		let channel = await user.getDmChannel();
 		let dump = await getChannelDump(msg, channel);
 		writeDump(dump, 'dm/' + user.id);
-	} else if (type === DUMP_TYPE.CHANNEL) {
+	} else if (type === dumpTypes.CHANNEL) {
 		let channel = suffix == null ? msg.channel : client.channels.get(suffix);
 		let dump = await getChannelDump(msg, channel);
 		writeDump(dump, 'channel/' + channel.id);
-	} else if (type === DUMP_TYPE.SERVER) {
+	} else if (type === dumpTypes.SERVER) {
 		let server = suffix == null ? msg.guild : client.guilds.get(suffix);
 		let dumps = await getServerDumps(msg, server);
 		for (let dump of dumps) {
 			writeDump(dump, 'server/' + server.id);
 		}
-	} else if (type === DUMP_TYPE.ALL) {
+	} else if (type === dumpTypes.ALL) {
 		await createFullDump(msg);
 	}
 }
