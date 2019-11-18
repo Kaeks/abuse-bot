@@ -187,7 +187,7 @@ module.exports = {
 /**
  * Returns whether or not a user is subscribed to the wednesday service
  * Will automatically fill the required data if it were to be missing
- * @param {User} user
+ * @param user
  * @returns {boolean}
  */
 function isSubscribed(user) {
@@ -200,7 +200,7 @@ function isSubscribed(user) {
 /**
  * Check whether or not the message was sent in a (group) DM channel
  * Will send an error message to the channel if that is the case
- * @param {Message} msg
+ * @param msg
  * @returns {boolean}
  */
 function checkDmOrGroup(msg) {

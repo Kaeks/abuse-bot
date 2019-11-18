@@ -114,7 +114,8 @@ if (!canRunBot) process.exit(1);
 let waterTimers = {};
 let runningWaterTimers = {};
 
-let reminders = new Discord.Collection(Reminders);
+let reminders = new Discord.Collection();
+
 let runningReminders = new Discord.Collection();
 
 let reactionListeners = new Discord.Collection();
@@ -129,9 +130,9 @@ const reactionEvents = require('./enum/ReactionEventEnum.js');
 module.exports = {
 	Discord, fs, chrono,
 	client,
-	Config, Storage, Blocked, Deleted, Edited, Reminders,
+	Config, Storage, Blocked, Deleted, Edited,
 	loadFile, saveFile,
-	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited,
+	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited, saveReminders,
 	debug, log, info, warn,
 	updatePresence,
 	parseDate,
@@ -141,7 +142,7 @@ module.exports = {
 	waterTimers, runningWaterTimers,
 	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
 	reminders, runningReminders, getRemindersOfUser,
-	addReminder, loadReminders, startReminder, stopReminder, startAllReminders, filterReminders, leaveAllReminders, joinReminder, leaveReminder,
+	loadReminders, addReminder, startAllReminders, filterReminders, leaveAllReminders, findChannelOfMsgId,
 	getBooleanValue, getUsers, getTimeZone, testBooleanValue,
 	reactionListeners, addReactionListener, REMINDER_SIGNUP_EMOJI
 };
@@ -224,13 +225,108 @@ function saveFile(filePath, variable) {
 	fs.writeFileSync(filePath, JSON.stringify(variable, null, 2));
 }
 
+// SPECIAL R/W
+
+/**
+ * Adds a reminder to the list
+ * @param reminder
+ */
+function addReminder(reminder) {
+	reminders.set(reminder.id, reminder);
+	reminder.start;
+}
+
+const Reminder = require('./class/Reminder.js');
+
+/**
+ * Loads all reminders into cache
+ */
+async function loadReminders() {
+	let collection = await readReminders();
+	collection.forEach(reminder => {
+		addReminder(reminder);
+	});
+	debug('Loaded all reminders.');
+}
+
+/**
+ * Gets a collection of all reminders including its real message values
+ * @returns {Promise<Discord.Collection<*,*>>}
+ */
+async function readReminders() {
+	debug('Reading all saved reminders...');
+	let collection = new Discord.Collection();
+	for (let reminderEntry of Reminders) {
+		let jsonReminder = reminderEntry[1];
+
+		let userMsgId = jsonReminder.userMsg.id;
+		let userMsgChannelId = jsonReminder.userMsg.channel.id;
+		let userMsg = await getMessageInChannelId(userMsgId, userMsgChannelId);
+
+		let botMsg;
+
+		if (jsonReminder.botMsg == null) {
+			botMsg = null;
+		} else {
+			let botMsgId = jsonReminder.botMsg.id;
+			let botMsgChannelId = jsonReminder.botMsg.channel.id;
+			botMsg = await getMessageInChannelId(botMsgId, botMsgChannelId);
+		}
+
+		let date = new Date(jsonReminder.date);
+		let task = jsonReminder.task;
+		let id = reminderEntry[0];
+
+		let reminder = new Reminder(
+			userMsg, date, task, botMsg, id
+		);
+		collection.set(id, reminder);
+	}
+	debug('Done!');
+	return collection;
+}
+
+/**
+ * Formats the list of cached reminders into a save-able form
+ * @returns {Discord.Collection}
+ */
+function formatReminders() {
+	let shortReminders = new Discord.Collection();
+	reminders.forEach((reminder, id) => {
+
+		let botMsg = reminder.botMsg == null ? null : {
+			id : reminder.botMsg.id,
+			channel : {
+				id : reminder.botMsg.channel.id,
+				type : reminder.botMsg.channel.type
+			}
+		};
+
+		let shortReminder = {
+			id : id,
+			userMsg : {
+				id : reminder.userMsg.id,
+				channel : {
+					id : reminder.userMsg.channel.id,
+					type : reminder.userMsg.channel.type
+				}
+			},
+			botMsg : botMsg,
+			date : reminder.date,
+			task : reminder.task
+		};
+		shortReminders.set(id, shortReminder);
+	});
+	return shortReminders;
+}
+
 // SPECIFIC SAVES
 function saveConfig()	{saveFile(CONFIG_PATH,	Config);	}
 function saveData() 	{saveFile(DATA_PATH, 	Storage);	}
 function saveBlocked()	{saveFile(BLOCKED_PATH, Blocked);	}
 function saveDeleted() 	{saveFile(DELETED_PATH, Deleted);	}
 function saveEdited() 	{saveFile(EDITED_PATH, 	Edited);	}
-function saveReminders(){saveFile(REMINDER_PATH, Array.from(reminders));}
+function saveReminders(){saveFile(REMINDER_PATH, Array.from(formatReminders()));}
 
 // HELPERS
 /**
@@ -254,6 +350,7 @@ const gameTypes = {
 	LISTENING : 2,
 	WATCHING : 3
 };
+
 /**
  * Updates the status and presence of the bot
  * @param {String} status
@@ -319,9 +416,21 @@ function parseDate(date) {
 	return `${dowString}, ${monthString}. ${getNumberWithOrdinal(day)} ${hours.pad(2)}:${minutes.pad(2)}`;
 }
 
+async function getMessageInChannelId(msgId, channelId) {
+	return await getMessageInChannel(msgId, client.channels.get(channelId));
+}
+
+async function getMessageInChannel(msgId, channel) {
+	try {
+		return await channel.fetchMessage(msgId);
+	} catch (e) {
+		info('Tried to find message with id ' + msgId + ' inside channel with id ' + channel.id + ' but couldn\'t find anything.');
+	}
+}
+
 /**
  * Gets the time zone of a user
- * @param {User} user
+ * @param user
  * @returns {string | *}
  */
 function getTimeZone(user) {
@@ -400,8 +509,8 @@ function getCommandHelp(command, commandChain = []) {
 
 /**
  * Returns an embed with *all* commands to the author of the message
- * @param {Message} msg
- * @param {RichEmbed} embed
+ * @param msg
+ * @param embed
  */
 function getFullHelpEmbed(msg, embed) {
 	const { commands } = msg.client;
@@ -413,7 +522,7 @@ function getFullHelpEmbed(msg, embed) {
 // WEDNESDAY
 /**
  * Sends an image of the wednesday frog to the specified channel
- * @param {Channel} channel
+ * @param channel
  */
 function sendWednesday(channel) {
 	let embed = new Discord.RichEmbed()
@@ -426,7 +535,7 @@ function sendWednesday(channel) {
 // WATER
 /**
  * Sends a water reminder to a user
- * @param {User} user
+ * @param user
  * @returns {Promise<boolean>}
  */
 async function sendWater(user) {
@@ -445,7 +554,7 @@ async function sendWater(user) {
 
 /**
  * Adds the water timer of a user to the list of cached water timers
- * @param {User} user
+ * @param user
  */
 function addWaterTimer(user) {
 	waterTimers[user.id] = Storage.users[user.id].water.interval;
@@ -468,7 +577,7 @@ function loadWaterTimers() {
 
 /**
  * Starts the water timer of a user
- * @param {User} user
+ * @param user
  */
 function startWaterTimer(user) {
 	let now = new Date();
@@ -498,7 +607,7 @@ function startAllWaterTimers() {
 
 /**
  * Stops the water timer of a user
- * @param {User} user
+ * @param user
  * @returns {boolean}
  */
 function stopWaterTimer(user) {
@@ -511,7 +620,7 @@ function stopWaterTimer(user) {
 
 /**
  * Updates the cached water timer of a user
- * @param {User} user
+ * @param user
  */
 function updateWaterTimer(user) {
 	stopWaterTimer(user);
@@ -521,7 +630,7 @@ function updateWaterTimer(user) {
 
 /**
  * Gets the time (in ms) until the water timer of a user fires
- * @param {User} user
+ * @param user
  * @returns {number}
  */
 function getWaterTimerStatus(user) {
@@ -554,89 +663,8 @@ function runAtDate(date, func) {
 }
 
 /**
- * Recursive running function of a reminder to handle times larger than the 32-bit signed positive integer limit in milliseconds
- * @param {Snowflake} id
- * @param {Date} started
- */
-function runReminderTimer(id, started = new Date()) {
-	let now = new Date();
-	let future = new Date(reminders.get(id).date);
-	let diff = future - now;
-	if (diff < 0) {
-		info('Reminder with id ' + id + ' has its starting point in the past. Deleting.');
-		deleteReminder(id);
-		return false;
-	}
-	let timer;
-	if (diff > 0x7FFFFFFF) {
-		timer = setTimeout(function() {
-			runReminderTimer(id, started);
-		});
-	} else {
-		timer = setTimeout(function() {
-			triggerReminder(id);
-		}, diff);
-	}
-	runningReminders.set(id, {
-		timer : timer,
-		started : started
-	});
-	return true;
-}
-
-/**
- * Adds a new reminder
- * @param {Message} msg
- * @param {Date} date
- * @param {String} task
- * @param {Message} botMsg
- * @return {Snowflake} reminderId
- */
-function addReminder(msg, date, task, botMsg) {
-	let msgLink = msg.getLink();
-	let id = Discord.SnowflakeUtil.generate();
-	let reminder = {
-		id : id,
-		users : [
-			msg.author.id
-		],
-		userMsg : {
-			id : msg.id,
-			channel : {
-				id : msg.channel.id,
-				type : msg.channel.type
-			}
-		},
-		botMsg : {
-			id : botMsg.id,
-			channel : {
-				id : botMsg.channel.id,
-				type : botMsg.channel.id
-			}
-		},
-		date : date,
-		msgLink : msgLink,
-		task : task
-	};
-	reminders.set(id, reminder);
-	saveReminders();
-	debug('Added reminder with id ' + id + ':');
-	debug(reminder);
-	startReminder(id);
-	return id;
-}
-
-/**
- * Loads all reminders into cache
- */
-function loadReminders() {
-	reminders = new Discord.Collection(Reminders);
-	debug('Loaded all reminders.');
-}
-
-/**
  * Sends notifications for the expired reminders inside the collection
- * @param {Collection<Discord.Snowflake, Object>}collection
+ * @param collection
  * @returns {Promise<void>}
  */
 async function notifyOldReminders(collection) {
@@ -652,7 +680,7 @@ async function notifyOldReminders(collection) {
 			if (reminder.task != null) {
 				tempText += ' - ' + reminder.task;
 			}
-			tempText += '](<' + reminder.msgLink + '>)';
+			tempText += '](<' + reminder.userMsg.getLink() + '>)';
 			if (reminder !== oldReminders.last()) {
 				tempText += '\n';
 			}
@@ -687,8 +715,8 @@ function filterReminders() {
 
 /**
  * Returns a collection of users that are signed up for the reminders in the reminder collection
- * @param {Collection<Discord.Snowflake, Object>} collection
- * @returns {Discord.Collection<Discord.Snowflake, Discord.User>}
+ * @param collection
+ * @returns {Collection<Snowflake, User>}
  */
 function getUsersWithReminders(collection = reminders) {
 	let users = new Discord.Collection();
@@ -706,85 +734,14 @@ function getUsersWithReminders(collection = reminders) {
 
 /**
  * Returns a collection of reminders in which the user appears inside the optionally provided collection of reminders
- * @param {User} user
- * @param {Collection<Discord.Snowflake, Object>} collection
- * @returns {Discord.Collection<Discord.Snowflake, Object>}
+ * @param user
+ * @param collection
+ * @returns {Collection<Snowflake, Object>}
  */
 function getRemindersOfUser(user, collection = reminders) {
 	return collection.filter(value => {
 		return value.users.includes(user.id);
 	});
-}
-
-/**
- * Sends a reminder to a user
- * @param {Snowflake} id
- * @param {User} user
- * @returns {Promise<void>}
- */
-async function sendReminder(id, user) {
-	let reminder = reminders.get(id);
-	let msgLink = reminder.msgLink;
-	let task = reminder.task;
-	let userAmt = reminder.users.length - 1;
-	let tempText = 'I\'m here to remind you about [this message](<' + msgLink + '>).';
-	if (task.length > 0) tempText += '\nThe task was:\n> ' + task;
-	let embed = new Discord.RichEmbed()
-		.setColor(colors.GREEN)
-		.setTitle('Reminder!')
-		.setDescription(tempText);
-	if (userAmt > 0) embed.setFooter(userAmt + ' other ' + (userAmt === 1 ? 'person' : 'people') + ' also got this reminder!');
-	let channel = await user.getDmChannel();
-	channel.send({ embed: embed });
-}
-
-/**
- * Triggers a reminder
- * @param {Snowflake} id
- * @returns {Promise<void>}
- */
-async function triggerReminder(id) {
-	let reminder = reminders.get(id);
-	let users = reminder.users;
-	for (let userEntry of users) {
-		let user = client.users.get(userEntry);
-		await sendReminder(id, user);
-	}
-	reminders.delete(id);
-	saveReminders();
-	debug('Triggered reminder with id ' + id + '.');
-}
-
-/**
- * Stops a reminder
- * @param {Snowflake} id
- */
-function stopReminder(id) {
-	if (!runningReminders.has(id)) {
-		info('Timer of reminder with id ' + id + ' was not running.');
-		return false;
-	}
-	let timerEntry = runningReminders.get(id);
-	clearInterval(timerEntry.timer);
-	runningReminders.delete(id);
-	debug('Stopped timer of reminder with id ' + id + '.');
-	return true;
-}
-
-/**
- * Deletes a reminder
- * @param {Snowflake} id
- */
-function deleteReminder(id) {
-	if (!reminders.has(id)) {
-		info('Reminder with id ' + id + ' does not exist and could not be deleted.');
-		return false;
-	}
-	stopReminder(id);
-	reminders.delete(id);
-	saveReminders();
-	debug('Deleted reminder with id ' + id + '.');
-	return true;
 }
 
 async function findChannelOfMsgId(id) {
@@ -804,118 +761,30 @@ async function findChannelOfMsgId(id) {
 			let message = await channel.fetchMessage(id);
 			return message.channel;
 		} catch (e) {
-			console.log('nah');
+			debug('This ain\'t it, chief.');
 		}
 	}
-
-}
-
-async function getFixedReminderMessage(msgId) {
-	let foundChannel = await findChannelOfMsgId(msgId);
-	return {
-		id : msgId,
-		channel : {
-			id : foundChannel.id,
-			type : foundChannel.type
-		}
-	}
-}
-
-async function fixReminder(id) {
-	let reminder = reminders.get(id);
-	if (!reminder.userMsg.hasOwnProperty('channel')) {
-		reminder.userMsg = await getFixedReminderMessage(reminder.userMsg);
-	}
-	if (!reminder.botMsg.hasOwnProperty('channel')) {
-		reminder.botMsg = await getFixedReminderMessage(reminder.botMsg);
-	}
-	reminders.set(id, reminder);
-	saveReminders();
-}
-
-/**
- * Starts a reminder
- * @param {Snowflake} id
- * @returns {boolean}
- */
-async function startReminder(id) {
-	if (!runReminderTimer(id)) {
-		info('Reminder with id ' + id + ' could not be started.');
-		return false;
-	}
-	debug('Started reminder with id ' + id + '.');
-
-	// migration
-	await fixReminder(id);
-
-	let reminder = reminders.get(id);
-
-	let channel = client.channels.get(reminder.botMsg.channel.id);
-	let botMsg = await channel.fetchMessage(reminder.botMsg.id);
-
-	addReactionListener(botMsg, (messageReaction, reactor, event) => {
-		if (event === reactionEvents.ADD) {
-			joinReminder(reactor, id);
-		} else if (event === reactionEvents.REMOVE) {
-			leaveReminder(reactor, id);
-		}
-	}, [ REMINDER_SIGNUP_EMOJI ]);
 }
 
 /**
  * Starts all reminders
  */
 function startAllReminders() {
-	reminders.forEach((value, key) => {
-		startReminder(key);
+	reminders.forEach(reminder => {
+		reminder.start();
 	});
 	debug('Started all reminder timers.');
 }
 
 /**
- * Adds a user to the list of users of a reminder
- * @param {User} user
- * @param {Snowflake} id
- * @return {boolean} success
- */
-function joinReminder(user, id) {
-	if (!reminders.has(id)) return false;
-	let reminder = reminders.get(id);
-	if (reminder.users.includes(user.id)) return false;
-	reminder.users.push(user.id);
-	saveReminders();
-	log(user + ' joined reminder ' + id + '.');
-	return true;
-}
-
-/**
- * Removes a user from the list of users of a reminder
- * @param {User} user
- * @param {Snowflake} id
- * @return {boolean} success
- */
-function leaveReminder(user, id) {
-	if (!reminders.has(id)) return false;
-	let reminder = reminders.get(id);
-	if (!reminder.users.includes(user.id)) return false;
-	reminder.users = reminder.users.filter(value => {
-		return value !== user.id;
-	});
-	saveReminders();
-	log(user + ' left reminder ' + id + '.');
-	return true;
-}
-
-/**
  * Removes a user from the list of users of all reminders
- * @param {User} user
+ * @param user
  */
 function leaveAllReminders(user) {
 	let userReminders = getRemindersOfUser(user);
-	for (let reminderEntry of userReminders) {
-		let reminder = reminderEntry[1];
-		if (reminder.users.includes(user.id)) leaveReminder(user, reminder.id);
-	}
+	userReminders.forEach(reminder => {
+		reminder.removeUser(user);
+	});
 	saveReminders();
 }
 
@@ -936,7 +805,7 @@ function getBooleanValue(suffix) {
 
 /**
  * Tests the value of a should-be boolean input. Sends an error message to the message's channel if the value is not a boolean
- * @param {Message} msg
+ * @param msg
  * @param {boolean} value
  * @returns {boolean}
  */
@@ -964,9 +833,17 @@ function getUsers() {
 }
 
 /**
+ * @name ReactionAction
+ * @function
+ * @param messageReaction
+ * @param user
+ * @param event
+ */
+
+/**
  * Add a reaction listener to a message with a function that triggers when a reaction from the list of reactions is added or removed
  * @param msg
- * @param fn
+ * @param {ReactionAction} fn
  * @param reactions
  */
 function addReactionListener(msg, fn, reactions = []) {

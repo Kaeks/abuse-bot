@@ -40,7 +40,7 @@ let badWordsRegExp = new RegExp('(?:^|' + specialChars + ')(' + joinedBadWords +
 
 //// EVENTS
 // START
-client.on('ready', () => {
+client.on('ready', async () => {
 	console.log('*hacker voice* I\'m in.');
 	console.log(`Agent ${client.user.username} signing in.`);
 	updatePresence();
@@ -57,7 +57,7 @@ client.on('ready', () => {
 	common.startAllWaterTimers();
 
 	// REMINDER SETUP
-	common.loadReminders();
+	await common.loadReminders();
 	common.filterReminders();
 	common.startAllReminders();
 
@@ -201,8 +201,7 @@ function handleReaction(messageReaction, user, event) {
 	listeners.forEach(listener => {
 		// Check if the message is being listened to and the reaction is accepted
 		if (message.id === listener.msgId) {
-			console.log(listener.reactions);
-			if (listener.reactions.indexOf(messageReaction.emoji.name) > -1) {
+			if (listener.reactions.includes(messageReaction.emoji.name)) {
 				listener.fn(messageReaction, user, event);
 			}
 		}
