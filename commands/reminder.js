@@ -70,7 +70,7 @@ module.exports = {
 				});
 				if (msg.channel.type !== 'dm') {
 					messagePromise.then(message => {
-						message.react(common.REMINDER_SIGNUP_EMOJI);
+						message.react(common.REMINDER_SIGNUP_EMOJI).catch(console.error);
 					});
 				}
 			}

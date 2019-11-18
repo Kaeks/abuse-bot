@@ -12,9 +12,9 @@ class Reminder {
 	date;
 	task;
 
-	constructor(userMsg, date, task, botMsg, id) {
+	constructor(userMsg, date, task, botMsg, id, users) {
 		this.id = id || Discord.SnowflakeUtil.generate();
-		this.users = [ userMsg.author.id ];
+		this.users = users || [ userMsg.author ];
 		this.userMsg = userMsg;
 		this.botMsg = botMsg;
 		this.date = date;
@@ -44,7 +44,7 @@ class Reminder {
 			});
 		} else {
 			timer = setTimeout(function() {
-				me.trigger();
+				me.trigger().catch(console.error);
 			}, diff);
 		}
 		common.runningReminders.set(this.id, {
@@ -182,8 +182,8 @@ class Reminder {
 	 * @return {boolean} success
 	 */
 	addUser(user) {
-		if (this.users.includes(user.id)) return false;
-		this.users.push(user.id);
+		if (this.users.includes(user)) return false;
+		this.users.push(user);
 		common.saveReminders();
 		common.log(user + ' joined reminder ' + this.id + '.');
 		return true;
@@ -195,20 +195,20 @@ class Reminder {
 	 * @return {boolean} success
 	 */
 	removeUser(user) {
-		if (!this.users.includes(user.id)) return false;
-		this.users = this.users.filter(value => {
-			return value !== user.id;
+		if (!this.users.includes(user)) return false;
+		this.users = this.users.filter(userEntry => {
+			return userEntry !== user;
 		});
 		common.saveReminders();
 		common.log(user + ' left reminder ' + this.id + '.');
 		return true;
 	}
 
-	getSingleLine(index) {
-		let indexString = '**#' + index + '**';
+	getSingleLine(listPosition) {
+		let positionString = ' **#' + listPosition + '**';
 		let linkString = '[' + common.parseDate(this.date) + '](<' + this.userMsg.getLink() + '>)';
 		let taskString = this.task.length > 0 ? '\n> ' + this.task : '';
-		return indexString + ' ' + linkString + taskString;
+		return positionString + ' ' + linkString + taskString;
 	}
 }
 

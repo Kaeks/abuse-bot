@@ -34,7 +34,7 @@ function getSubList(collection, page = 0) {
 	for (let i = page * ITEM_LIMIT; i < ITEM_LIMIT * (page + 1); i++) {
 		let cur = collection.array()[i];
 		if (cur === undefined) break;
-		subList.set(cur.id, cur);
+		subList.set(i, cur);
 	}
 	return subList;
 }
@@ -63,18 +63,17 @@ class ReminderList {
 		this.timer = setTimeout(function() {
 			me.delete();
 		}, diff);
-		common.debug('Started reminder expire timer with id ' + this.id + '.');
 	}
 
 	stopExpireTimer() {
 		clearTimeout(this.timer);
 		this.timer = undefined;
-		common.debug('Stopped reminder expire timer with id ' + this.id + '.');
 	}
 
 	resetExpireTimer() {
 		this.stopExpireTimer();
 		this.startExpireTimer();
+		common.debug('Reset reminder list expire timer with id ' + this.id + '.');
 	}
 
 	delete() {
@@ -83,13 +82,9 @@ class ReminderList {
 		common.debug('Deleted reminder list with id ' + this.id + '.');
 	}
 
-	getCurList() {
-		return getSubList(this.reminders, this.curPage);
-	}
-
 	getReminderOfCurList(num) {
 		let iterator = 0;
-		for (let reminderEntry of this.getCurList()) {
+		for (let reminderEntry of getSubList(this.reminders, this.curPage)) {
 			if (iterator === num) {
 				return reminderEntry[1];
 			}
@@ -99,7 +94,7 @@ class ReminderList {
 
 	updateMessage() {
 		let updatedEmbed = this.getEmbed(this.msg.channel);
-		this.msg.edit(updatedEmbed);
+		this.msg.edit(updatedEmbed).catch(console.error);
 		common.debug('Updated message of reminder list with id ' + this.id + '.');
 	}
 
@@ -184,12 +179,12 @@ class ReminderList {
 
 		let tempText = '';
 
-		let subList = this.getCurList();
+		let subList = getSubList(this.reminders.simplify(), this.curPage);
 		let listIterator = 0;
-		subList.forEach((reminder, key) => {
-			tempText += reminder.getSingleLine(listIterator);
+		subList.forEach((reminder, index) => {
+			tempText += emojiNums[listIterator] + reminder.getSingleLine(index);
 			listIterator++;
-			if (key !== subList.lastKey) tempText += '\n';
+			if (index !== subList.lastKey) tempText += '\n';
 		});
 
 		embed.setDescription(tempText);

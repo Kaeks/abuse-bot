@@ -124,6 +124,7 @@ let reactionListeners = new Discord.Collection();
 const colors = require('./enum/EmbedColorEnum.js');
 const months = require('./enum/MonthEnum.js');
 const daysOfWeek = require('./enum/WeekDayEnum.js');
+const argumentValues = require('./enum/ArgumentValueEnum.js');
 const reactionEvents = require('./enum/ReactionEventEnum.js');
 
 //// EXPORTS
@@ -234,6 +235,7 @@ function saveFile(filePath, variable) {
 function addReminder(reminder) {
 	reminders.set(reminder.id, reminder);
 	reminder.start;
+	saveReminders();
 }
 
 const Reminder = require('./class/Reminder.js');
@@ -277,8 +279,15 @@ async function readReminders() {
 		let task = jsonReminder.task;
 		let id = reminderEntry[0];
 
+		let users = [];
+
+		for (let userEntry of jsonReminder.users) {
+			let user = client.users.get(userEntry);
+			users.push(user);
+		}
+
 		let reminder = new Reminder(
-			userMsg, date, task, botMsg, id
+			userMsg, date, task, botMsg, id, users
 		);
 		collection.set(id, reminder);
 	}
@@ -302,8 +311,11 @@ function formatReminders() {
 			}
 		};
 
+		let shortUsers = reminder.users.map(val => val.id);
+
 		let shortReminder = {
 			id : id,
+			users : shortUsers,
 			userMsg : {
 				id : reminder.userMsg.id,
 				channel : {
@@ -582,7 +594,7 @@ function loadWaterTimers() {
 function startWaterTimer(user) {
 	let now = new Date();
 	let timer = setInterval(function() {
-		sendWater(user);
+		sendWater(user).catch(console.error);
 	}, waterTimers[user.id]  * 60 * 1000);
 
 	runningWaterTimers[user.id] = {
@@ -701,15 +713,15 @@ function filterReminders() {
 	let now = new Date();
 	let amt = 0;
 	let filtered = reminders.filter(reminder => {
-		return (new Date(reminder.date) <= now);
-	});
-	reminders = reminders.filter(reminder => {
-		let bool = (new Date(reminder.date) > now);
+		let bool = (new Date(reminder.date) <= now);
 		if (bool) amt++;
 		return bool;
 	});
+	reminders = reminders.filter(reminder => {
+		return (new Date(reminder.date) > now);
+	});
 	debug(`Removed ${amt} outdated reminders.`);
-	notifyOldReminders(filtered);
+	notifyOldReminders(filtered).catch(console.error);
 	saveReminders();
 }
 
@@ -722,10 +734,9 @@ function getUsersWithReminders(collection = reminders) {
 	let users = new Discord.Collection();
 	collection.forEach(reminder => {
 		for (let i = 0; i < reminder.users.length; i++) {
-			let userEntry = reminder.users[i];
-			let user = client.users.get(userEntry);
-			if (!users.has(userEntry)) {
-				users.set(userEntry, user);
+			let user = reminder.users[i];
+			if (!users.has(user.id)) {
+				users.set(user.id, user);
 			}
 		}
 	});
@@ -740,7 +751,7 @@ function getUsersWithReminders(collection = reminders) {
  */
 function getRemindersOfUser(user, collection = reminders) {
 	return collection.filter(value => {
-		return value.users.includes(user.id);
+		return value.users.includes(user);
 	});
 }
 

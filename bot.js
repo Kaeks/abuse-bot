@@ -184,15 +184,6 @@ client.on('messageUpdate', (oldMessage, newMessage) => {
 	saveEdited();
 });
 
-function getReminderFromMessage(msg) {
-	let reminders = common.reminders;
-	for (let reminderEntry of reminders) {
-		let reminder = reminderEntry[1];
-		if (msg.id === reminder.botMsg.id) return reminder;
-	}
-	return undefined;
-}
-
 function handleReaction(messageReaction, user, event) {
 	if (user.bot) return false;
 	let message = messageReaction.message;
