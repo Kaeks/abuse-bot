@@ -272,7 +272,6 @@ function setUpUser(msg, user) {
 	}
 	Storage.users[user.id].wednesday = Storage.users[user.id].wednesday || {};
 	Storage.users[user.id].water = Storage.users[user.id].water || {};
-	Storage.users[user.id].timeZone = Storage.users[user.id].timeZone || '+0100';
 	msg.channel.send(
 		`Hey, ${user}! This seems to be your first time interacting with me. ` +
 		`Make sure to enable DMs from users on this server to be able to receive personal messages used for a variety of my functions.`
@@ -338,7 +337,7 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 	// If the use is not valid, display help
 	if (isValidUse) {
 		let suffixString = suffix == null ? '' : ' with suffix: \'' + suffix + '\'';
-		common.log('User ' + msg.author.username + '#' + msg.author.discriminator + ' issued command \'' + commandString + '\'' + suffixString + '.');
+		common.log('User ' + msg.author.getHandle() + ' issued command \'' + commandString + '\'' + suffixString + '.');
 		if (command.hasOwnProperty('execute')) {
 			command.execute(msg, suffix);
 			return true;

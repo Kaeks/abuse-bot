@@ -181,9 +181,10 @@ async function getChannelDump(msg, channel) {
 	// get channel name
 	let str = 'Creating dump for ';
 	if (channel.type === 'dm') {
-		str += 'DM channel with ' + channel.recipient.username + '#' + channel.recipient.discriminator + ' (' + channel.recipient.id + ')';
+		let handle = channel.recipient.getHandle();
+		str += 'DM channel with ' + handle + ' (' + channel.recipient.id + ')';
 		channelInfo.recipient = {
-			handle : channel.recipient.username + '#' + channel.recipient.discriminator,
+			handle : handle,
 			id : channel.recipient.id
 		}
 	} else if (channel.type === 'group') {
@@ -214,7 +215,7 @@ async function getChannelDump(msg, channel) {
 				type : msg.channel.type
 			},
 			by : {
-				handle : msg.author.username + '#' + msg.author.discriminator,
+				handle : msg.author.getHandle(),
 				id : msg.author.id
 			}
 		},
@@ -259,7 +260,7 @@ async function getShortenedMessages(channel, filter) {
 	request.forEach(message => {
 
 		let shortened = {
-			author : message.author.username + '#' + message.author.discriminator,
+			author : message.author.getHandle(),
 			content : message.content,
 			attachments : []
 		};

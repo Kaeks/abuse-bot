@@ -190,7 +190,7 @@ class ReminderList {
 		embed.setDescription(tempText);
 
 		if (channel.type !== 'dm') {
-			let userHandle = user.username + '#' + user.discriminator;
+			let userHandle = user.getHandle();
 			let userString = channel.type === 'text' ?
 				(this.userMsg.member.nickname || user.username) + ' (' + userHandle + ')' :
 				channel.type === 'group' ? userHandle : '';

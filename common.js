@@ -28,6 +28,10 @@ Discord.User.prototype.sendDm = async function(data) {
 	return channel.send(data);
 };
 
+Discord.User.prototype.getHandle = function() {
+	return this.username + '#' + this.discriminator;
+};
+
 /**
  * Returns the direct link to a message
  * @returns {String}
@@ -51,12 +55,12 @@ Discord.Collection.prototype.simplify = function () {
 };
 
 // CONSTANTS
-const CONFIG_PATH = './config.json';
-const DATA_PATH = './storage/data.json';
-const BLOCKED_PATH = './storage/blocked_users.json';
-const DELETED_PATH = './storage/deleted_messages.json';
-const EDITED_PATH = './storage/edited_messages.json';
-const REMINDER_PATH = './storage/reminders.json';
+const CONFIG_PATH 	= './config.json';
+const DATA_PATH 	= './storage/data.json';
+const BLOCKED_PATH 	= './storage/blocked_users.json';
+const DELETED_PATH 	= './storage/deleted_messages.json';
+const EDITED_PATH 	= './storage/edited_messages.json';
+const REMINDER_PATH	= './storage/reminders.json';
 
 const REMINDER_SIGNUP_EMOJI = '🙋';
 
@@ -69,12 +73,12 @@ let Edited = [];
 let Reminders = [];
 
 // LOAD FILES
-Config = loadFile(CONFIG_PATH, Config);
-Storage = loadFile(DATA_PATH, Storage);
-Blocked = loadFile(BLOCKED_PATH, Blocked);
-Deleted = loadFile(DELETED_PATH, Deleted);
-Edited = loadFile(EDITED_PATH, Edited);
-Reminders = loadFile(REMINDER_PATH, Reminders);
+Config =	loadFile(CONFIG_PATH, Config);
+Storage =	loadFile(DATA_PATH, Storage);
+Blocked =	loadFile(BLOCKED_PATH, Blocked);
+Deleted =	loadFile(DELETED_PATH, Deleted);
+Edited =	loadFile(EDITED_PATH, Edited);
+Reminders =	loadFile(REMINDER_PATH, Reminders);
 
 // SET DEFAULT VALUES
 Config.prefix = Config.prefix || '!';
@@ -114,11 +118,10 @@ if (!canRunBot) process.exit(1);
 let waterTimers = {};
 let runningWaterTimers = {};
 
-let reminders = new Discord.Collection();
+let reminders			= new Discord.Collection();
+let runningReminders	= new Discord.Collection();
 
-let runningReminders = new Discord.Collection();
-
-let reactionListeners = new Discord.Collection();
+let reactionListeners	= new Discord.Collection();
 
 // ENUM
 const colors = require('./enum/EmbedColorEnum.js');
@@ -182,17 +185,13 @@ function log(msg) {
  * Sends a message with the prefix [INFO] to the console in yellow
  * @param {*} msg
  */
-function info(msg) {
-	console.log('\x1b[33m%s\x1b[0m', `[INFO] ${msg}`);
-}
+function info(msg) { console.log('\x1b[33m%s\x1b[0m', `[INFO] ${msg}`); }
 
 /**
  * Sends a message with the prefix [WARN] to the console in red
  * @param {*} msg
  */
-function warn(msg) {
-	console.log('\x1b[31m%s\x1b[0m', `[WARN] ${msg}`);
-}
+function warn(msg) { console.log('\x1b[31m%s\x1b[0m', `[WARN] ${msg}`); }
 
 // FILESYSTEM
 /**
@@ -228,6 +227,7 @@ function saveFile(filePath, variable) {
 
 // SPECIAL R/W
 
+const Reminder = require('./class/Reminder.js');
 /**
  * Adds a reminder to the list
  * @param reminder
@@ -237,8 +237,6 @@ function addReminder(reminder) {
 	reminder.start;
 	saveReminders();
 }
-
-const Reminder = require('./class/Reminder.js');
 
 /**
  * Loads all reminders into cache
@@ -281,9 +279,11 @@ async function readReminders() {
 
 		let users = [];
 
-		for (let userEntry of jsonReminder.users) {
-			let user = client.users.get(userEntry);
-			users.push(user);
+		if (jsonReminder.users) {
+			for (let userEntry of jsonReminder.users) {
+				let user = client.users.get(userEntry);
+				users.push(user);
+			}
 		}
 
 		let reminder = new Reminder(
@@ -297,7 +297,6 @@ async function readReminders() {
 
 /**
  * Formats the list of cached reminders into a save-able form
- * @returns {Discord.Collection}
  */
 function formatReminders() {
 	let shortReminders = new Discord.Collection();
@@ -333,14 +332,20 @@ function formatReminders() {
 }
 
 // SPECIFIC SAVES
-function saveConfig()	{saveFile(CONFIG_PATH,	Config);	}
-function saveData() 	{saveFile(DATA_PATH, 	Storage);	}
-function saveBlocked()	{saveFile(BLOCKED_PATH, Blocked);	}
-function saveDeleted() 	{saveFile(DELETED_PATH, Deleted);	}
-function saveEdited() 	{saveFile(EDITED_PATH, 	Edited);	}
-function saveReminders(){saveFile(REMINDER_PATH, Array.from(formatReminders()));}
+function saveConfig()		{saveFile(CONFIG_PATH,	Config);	}
+function saveData() 		{saveFile(DATA_PATH, 	Storage);	}
+function saveBlocked()		{saveFile(BLOCKED_PATH, Blocked);	}
+function saveDeleted() 		{saveFile(DELETED_PATH, Deleted);	}
+function saveEdited() 		{saveFile(EDITED_PATH, 	Edited);	}
+function saveReminders()	{saveFile(REMINDER_PATH, Array.from(formatReminders()));}
 
 // HELPERS
+
+function getDbUserEntry(user) {
+	if (!Storage.users.hasOwnProperty(user.id)) throw 'User doesn\'t have an entry.';
+	return Storage.users[user.id];
+}
+
 /**
  * Returns a number with its ordinal (1st, 2nd, 3rd, 4th, ...)
  * @param {Number} n
@@ -351,17 +356,6 @@ function getNumberWithOrdinal(n) {
 		v = n % 100;
 	return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
-
-/**
- * Enum for the game types a {Discord.Presence} can have
- * @type {{WATCHING: number, LISTENING: number, STREAMING: number, PLAYING: number}}
- */
-const gameTypes = {
-	PLAYING : 0,
-	STREAMING : 1,
-	LISTENING : 2,
-	WATCHING : 3
-};
 
 /**
  * Updates the status and presence of the bot
@@ -438,15 +432,6 @@ async function getMessageInChannel(msgId, channel) {
 	} catch (e) {
 		info('Tried to find message with id ' + msgId + ' inside channel with id ' + channel.id + ' but couldn\'t find anything.');
 	}
-}
-
-/**
- * Gets the time zone of a user
- * @param user
- * @returns {string | *}
- */
-function getTimeZone(user) {
-	return Storage.users[user.id].timeZone;
 }
 
 /**
