@@ -32,6 +32,14 @@ Discord.User.prototype.getHandle = function() {
 	return this.username + '#' + this.discriminator;
 };
 
+Discord.User.prototype.isWaterMember = function() {
+	return !(
+		Storage.users[this.id] === undefined ||
+		Storage.users[this.id].water === undefined ||
+		Storage.users[this.id].water.enabled !== true
+	);
+};
+
 /**
  * Returns the direct link to a message
  * @returns {String}
@@ -115,8 +123,8 @@ if (Config.ownerId === null) {
 if (!canRunBot) process.exit(1);
 
 // SHARED VARS
-let waterTimers = {};
-let runningWaterTimers = {};
+let waterTimers			= new Discord.Collection();
+let runningWaterTimers	= new Discord.Collection();
 
 let reminders			= new Discord.Collection();
 let runningReminders	= new Discord.Collection();
@@ -129,6 +137,7 @@ const months = require('./enum/MonthEnum.js');
 const daysOfWeek = require('./enum/WeekDayEnum.js');
 const argumentValues = require('./enum/ArgumentValueEnum.js');
 const reactionEvents = require('./enum/ReactionEventEnum.js');
+const gameTypes = require('./enum/GameTypeEnum.js');
 
 //// EXPORTS
 module.exports = {
@@ -136,18 +145,16 @@ module.exports = {
 	client,
 	Config, Storage, Blocked, Deleted, Edited,
 	loadFile, saveFile,
-	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited, saveReminders,
+	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited, saveReminders, saveWaterTimers,
 	debug, log, info, warn,
-	updatePresence,
-	parseDate,
+	updatePresence, findChannelOfMsgId, parseDate,
 	sendWednesday,
-	combineCommandChain,
-	getHelpRow, getCommandHelp, getFullHelpEmbed,
+	combineCommandChain, getCommandHelp, getFullHelpEmbed,
 	waterTimers, runningWaterTimers,
-	sendWater, addWaterTimer, loadWaterTimers, startWaterTimer, startAllWaterTimers, stopWaterTimer, updateWaterTimer, getWaterTimerStatus,
+	loadWaterTimers, addWaterTimer, startAllWaterTimers,
 	reminders, runningReminders, getRemindersOfUser,
-	loadReminders, addReminder, startAllReminders, filterReminders, leaveAllReminders, findChannelOfMsgId,
-	getBooleanValue, getUsers, getTimeZone, testBooleanValue,
+	loadReminders, addReminder, startAllReminders, filterReminders, leaveAllReminders,
+	getBooleanValue, getUsers, testBooleanValue,
 	reactionListeners, addReactionListener, REMINDER_SIGNUP_EMOJI
 };
 
@@ -228,13 +235,14 @@ function saveFile(filePath, variable) {
 // SPECIAL R/W
 
 const Reminder = require('./class/Reminder.js');
+const WaterTimer = require('./class/WaterTimer.js');
+
 /**
  * Adds a reminder to the list
  * @param reminder
  */
 function addReminder(reminder) {
 	reminders.set(reminder.id, reminder);
-	reminder.start;
 	saveReminders();
 }
 
@@ -329,6 +337,62 @@ function formatReminders() {
 		shortReminders.set(id, shortReminder);
 	});
 	return shortReminders;
+}
+
+/**
+ * Adds a water timer to the list of cached water timers
+ * @param waterTimer
+ */
+function addWaterTimer(waterTimer) {
+	waterTimers.set(waterTimer.user.id, waterTimer);
+	saveWaterTimers();
+}
+
+/**
+ * Loads all water timers to the list of cached water timers
+ */
+function loadWaterTimers() {
+	for (let userId in Storage.users) {
+		if (!Storage.users.hasOwnProperty(userId)) continue;
+		let userEntry = Storage.users[userId];
+		if (!userEntry.hasOwnProperty('water')) continue;
+		if (userEntry.water.enabled === true) {
+			let user = client.users.get(userId);
+			let lastDate = userEntry.water.lastDate ? new Date(userEntry.water.lastDate) : undefined;
+			let nextDate = userEntry.water.nextDate ? new Date(userEntry.water.nextDate) : undefined;
+			let missed = userEntry.water.missed || 0;
+			let waterTimer = new WaterTimer(user, userEntry.water.interval, lastDate, nextDate, missed);
+			addWaterTimer(waterTimer);
+		}
+	}
+	debug('Loaded all water timers.');
+}
+
+/**
+ * Saves all cached water timers into the database
+ */
+function saveWaterTimers() {
+	waterTimers.forEach(waterTimer => {
+		let user = waterTimer.user;
+		let userWater = Storage.users[user.id].water;
+		userWater.interval = waterTimer.interval;
+		userWater.lastDate = waterTimer.lastDate;
+		userWater.nextDate = waterTimer.nextDate;
+		userWater.missed = waterTimer.missed;
+	});
+	saveData();
+}
+
+/**
+ * Starts the water timers of all users
+ */
+function startAllWaterTimers() {
+	waterTimers.forEach(waterTimer => {
+		if (waterTimer.user.isWaterMember) {
+			waterTimer.start();
+		}
+	});
+	debug('Started all water timers.');
 }
 
 // SPECIFIC SAVES
@@ -527,118 +591,6 @@ function sendWednesday(channel) {
 		.setColor(colors.GREEN)
 		.setImage('https://i.kym-cdn.com/photos/images/newsfeed/001/091/264/665.jpg');
 	channel.send({ embed: embed });
-}
-
-// WATER
-/**
- * Sends a water reminder to a user
- * @param user
- * @returns {Promise<boolean>}
- */
-async function sendWater(user) {
-	runningWaterTimers[user.id].started = new Date();
-	if (user.presence.status === 'offline' || (user.presence.status === 'dnd' && Storage.users[user.id].water.ignoreDnD !== true)) {
-		return false;
-	}
-	let embed = new Discord.RichEmbed()
-		.setColor(colors.BLURPLE)
-		.setTitle('Stay hydrated!')
-		.setDescription('Drink some water **now**.')
-		.setThumbnail('https://media.istockphoto.com/photos/splash-fresh-drop-in-water-close-up-picture-id801948192');
-	let channel = await user.getDmChannel();
-	channel.send({ embed: embed });
-}
-
-/**
- * Adds the water timer of a user to the list of cached water timers
- * @param user
- */
-function addWaterTimer(user) {
-	waterTimers[user.id] = Storage.users[user.id].water.interval;
-}
-
-/**
- * Loads all water timers to the list of cached water timers
- */
-function loadWaterTimers() {
-	for (let userEntry in Storage.users) {
-		if (!Storage.users.hasOwnProperty(userEntry)) continue;
-		if (!Storage.users[userEntry].hasOwnProperty('water')) continue;
-		if (Storage.users[userEntry].water.enabled === true) {
-			let user = client.users.get(userEntry);
-			addWaterTimer(user);
-		}
-	}
-	debug('Loaded all water timers.');
-}
-
-/**
- * Starts the water timer of a user
- * @param user
- */
-function startWaterTimer(user) {
-	let now = new Date();
-	let timer = setInterval(function() {
-		sendWater(user).catch(console.error);
-	}, waterTimers[user.id]  * 60 * 1000);
-
-	runningWaterTimers[user.id] = {
-		timer : timer,
-		started : now
-	};
-
-	debug('Started water timer for ' + user.username + '#' + user.discriminator);
-}
-
-/**
- * Starts the water timers of all users
- */
-function startAllWaterTimers() {
-	for (let userEntry in waterTimers) {
-		if (!waterTimers.hasOwnProperty(userEntry)) continue;
-		let user = client.users.get(userEntry);
-		startWaterTimer(user);
-	}
-	debug('Started all water timers.');
-}
-
-/**
- * Stops the water timer of a user
- * @param user
- * @returns {boolean}
- */
-function stopWaterTimer(user) {
-	if (runningWaterTimers[user.id] === undefined) {
-		return false;
-	}
-	clearInterval(runningWaterTimers[user.id].timer);
-	runningWaterTimers[user.id] = undefined;
-}
-
-/**
- * Updates the cached water timer of a user
- * @param user
- */
-function updateWaterTimer(user) {
-	stopWaterTimer(user);
-	waterTimers[user.id] = Storage.users[user.id].water.interval;
-	startWaterTimer(user);
-}
-
-/**
- * Gets the time (in ms) until the water timer of a user fires
- * @param user
- * @returns {number}
- */
-function getWaterTimerStatus(user) {
-	let now = new Date();
-	debug(now);
-	let started = runningWaterTimers[user.id].started;
-	let future = new Date(started.getTime() + waterTimers[user.id] * 60 * 1000);
-	debug(future);
-	let diff = future - now;
-	debug(diff);
-	return diff;
 }
 
 // REMINDERS

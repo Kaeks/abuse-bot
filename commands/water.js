@@ -2,11 +2,12 @@ const common = require('../common.js');
 const {
 	Discord,
 	Storage, saveData,
-	waterTimers, runningWaterTimers,
-	addWaterTimer, stopWaterTimer, updateWaterTimer, getWaterTimerStatus
 } = common;
+
 const argumentValues = require('../enum/ArgumentValueEnum.js');
 const colors = require('../enum/EmbedColorEnum.js');
+
+const WaterTimer = require('../class/WaterTimer.js');
 
 // Default water interval (in minutes) to be set when people join the water club
 const DEFAULT_WATER_INTERVAL = 60;
@@ -22,11 +23,11 @@ module.exports = {
 			description : 'Display your current water status.',
 			execute(msg) {
 				let user = msg.author;
-				if (!isWaterMember(user)) {
+				if (!user.isWaterMember()) {
 					sendNotInWaterClub(msg);
 					return false;
 				}
-				let milliseconds = getWaterTimerStatus(user);
+				let milliseconds = common.waterTimers.get(user.id).getStatus();
 				let seconds = Math.floor(milliseconds / 1000);
 				let minutes = Math.floor(seconds / 60);
 				let newSeconds = seconds - minutes * 60;
@@ -49,7 +50,7 @@ module.exports = {
 				storageUser = storageUser || {};
 				storageUser.water = storageUser.water || {};
 				let embed = new Discord.RichEmbed();
-				if (isWaterMember(user)) {
+				if (user.isWaterMember()) {
 					embed.setColor(colors.RED)
 						.setTitle('Already a HydroHomie!')
 						.setDescription('You are already a member of the water club!');
@@ -66,7 +67,8 @@ module.exports = {
 						'\nYou will be notified every ' + storageUser.water.interval + ' minutes (default value).'
 					);
 				msg.channel.send({ embed: embed });
-				addWaterTimer(user);
+				let waterTimer = new WaterTimer(user, storageUser.water.interval);
+				common.addWaterTimer(waterTimer);
 			}
 		},
 		{
@@ -76,13 +78,16 @@ module.exports = {
 			description : 'Leave the water club.',
 			execute(msg) {
 				let user = msg.author;
-				if (!isWaterMember(user)) {
+				if (!user.isWaterMember()) {
 					sendNotInWaterClub(msg);
 					return false;
 				}
 				Storage.users[user.id].water.enabled = false;
-				saveData();
-				stopWaterTimer(user);
+
+				common.waterTimers.get(user.id).stop();
+
+				common.saveWaterTimers();
+
 				let embed = new Discord.RichEmbed()
 					.setColor(colors.GREEN)
 					.setTitle('No longer a HydroHomie')
@@ -101,7 +106,7 @@ module.exports = {
 					description : 'Set a new interval (in minutes)',
 					execute(msg, suffix) {
 						let user = msg.author;
-						if (!isWaterMember(user)) {
+						if (!user.isWaterMember()) {
 							sendNotInWaterClub(msg);
 							return false;
 						}
@@ -109,14 +114,10 @@ module.exports = {
 						if (!isNaN(newIntervalString)) {
 							if (parseInt(newIntervalString, 10) > 0 ) {
 								let newInterval = parseInt(newIntervalString, 10);
-								Storage.users[user.id].water.interval = newInterval;
-								saveData();
 
-								common.debug(waterTimers);
-								common.debug(runningWaterTimers);
-								updateWaterTimer(user);
-								common.debug(waterTimers);
-								common.debug(runningWaterTimers);
+								let waterTimer = common.waterTimers.get(user.id);
+
+								waterTimer.updateInterval(newInterval);
 
 								let embed = new Discord.RichEmbed()
 									.setColor(colors.GREEN)
@@ -146,7 +147,7 @@ module.exports = {
 			description : 'Display your current interval',
 			execute(msg) {
 				let user = msg.author;
-				if (!isWaterMember(user)) {
+				if (!user.isWaterMember()) {
 					sendNotInWaterClub(msg);
 					return false;
 				}
@@ -169,13 +170,13 @@ module.exports = {
 					description : [ 'Set whether or not I should ignore your DnD status and send you water reminders regardless.' ],
 					execute(msg, suffix) {
 						let user = msg.author;
-						if (!isWaterMember(user)) {
+						if (!user.isWaterMember()) {
 							sendNotInWaterClub(msg);
 							return false;
 						}
 						let boolValue = common.getBooleanValue(suffix);
 						if (!common.testBooleanValue(msg, boolValue)) return false;
-						Storage.users[user.id].water.ignoreDnD = boolValue;
+						Storage.users[user.id].water.ignoreDnd = boolValue;
 						saveData();
 						let embed = new Discord.RichEmbed()
 							.setColor(colors.GREEN)
@@ -189,7 +190,7 @@ module.exports = {
 			description : [ 'View whether I ignore your DnD status.' ],
 			execute(msg) {
 				let user = msg.author;
-				if (!isWaterMember(user)) {
+				if (!user.isWaterMember()) {
 					sendNotInWaterClub(msg);
 					return false;
 				}
@@ -204,16 +205,8 @@ module.exports = {
 	]
 };
 
-function isWaterMember(user) {
-	return !(
-		Storage.users[user.id] === undefined ||
-		Storage.users[user.id].water === undefined ||
-		Storage.users[user.id].water.enabled !== true
-	);
-}
-
 function sendNotInWaterClub(msg) {
-	if (!isWaterMember(msg.author)) {
+	if (!msg.author.isWaterMember()) {
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.RED)
 			.setTitle('Not a HydroHomie!')
