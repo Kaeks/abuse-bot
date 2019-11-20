@@ -10,6 +10,15 @@ Number.prototype.pad = function(size) {
 
 // AMENDS TO DISCORD.JS LIBRARY
 /**
+ * Returns the database entry of the server
+ * @returns {Object}
+ */
+Discord.Guild.prototype.getDbEntry = function() {
+	if (!Storage.servers.hasOwnProperty(this.id)) throw 'Server with id ' + this.id + 'doesn\'t have an entry.';
+	return Storage.servers[this.id];
+};
+
+/**
  * Returns the DM Channel of a user. Creates one if it does not exist.
  * @returns {Promise<DMChannel|undefined>}
  */
@@ -28,16 +37,49 @@ Discord.User.prototype.sendDm = async function(data) {
 	return channel.send(data);
 };
 
+/**
+ * Returns the full handle (name, #, discriminator) of the user
+ * @returns {string}
+ */
 Discord.User.prototype.getHandle = function() {
 	return this.username + '#' + this.discriminator;
 };
 
+/**
+ * Returns whether or not the user is a member of the water club
+ * @returns {boolean}
+ */
 Discord.User.prototype.isWaterMember = function() {
 	return !(
 		Storage.users[this.id] === undefined ||
 		Storage.users[this.id].water === undefined ||
 		Storage.users[this.id].water.enabled !== true
 	);
+};
+
+/**
+ * Returns the database entry of the user
+ * @returns {Object}
+ */
+Discord.User.prototype.getDbEntry = function() {
+	if (!Storage.users.hasOwnProperty(this.id)) throw 'User ' + this.getHandle() + 'doesn\'t have an entry.';
+	return Storage.users[this.id];
+};
+
+Discord.User.prototype.getPermissionLevel = function(msg) {
+	let dbEntry = this.getDbEntry();
+	let permissionLevel = dbEntry.permissionLevel ? dbEntry.permissionLevel : 0;
+	if (permissionLevel === permissionLevels.NONE) {
+		if (msg.channel.type === 'text') {
+			let server = msg.channel.guild;
+			let serverDbEntry = server.getDbEntry();
+			let serverOwnerRole = msg.channel.guild.roles.get(serverDbEntry.roles.owner);
+			let serverSuperUserRole = msg.channel.guild.roles.get(serverDbEntry.roles.superuser);
+			if (msg.member.roles.has(serverOwnerRole.id)) return permissionLevels.SERVER_OWNER;
+			if (msg.member.roles.has(serverSuperUserRole.id)) return permissionLevels.SERVER_SUPERUSER;
+		}
+	}
+	return permissionLevel;
 };
 
 /**
@@ -138,6 +180,7 @@ const daysOfWeek = require('./enum/WeekDayEnum.js');
 const argumentValues = require('./enum/ArgumentValueEnum.js');
 const reactionEvents = require('./enum/ReactionEventEnum.js');
 const gameTypes = require('./enum/GameTypeEnum.js');
+const permissionLevels = require('./enum/PermissionLevelEnum.js');
 
 //// EXPORTS
 module.exports = {
@@ -405,9 +448,12 @@ function saveReminders()	{saveFile(REMINDER_PATH, Array.from(formatReminders()))
 
 // HELPERS
 
-function getDbUserEntry(user) {
-	if (!Storage.users.hasOwnProperty(user.id)) throw 'User doesn\'t have an entry.';
-	return Storage.users[user.id];
+/**
+ * Returns the user instance of the owner of the bot, as specified inside `config.json`
+ * @returns {User}
+ */
+function getOwner() {
+	return client.users.get(Config.ownerId);
 }
 
 /**
@@ -521,7 +567,7 @@ function combineCommandChain(commandChain) {
  */
 function getHelpRow(commandString, usage, description = undefined) {
 	let base = '`' + Config.prefix + commandString + ' ' + usage + '`' + '\n';
-	return description === undefined ? base : base + '-- ' + description + '\n';
+	return description === undefined ? base : base + '> ' + description + '\n';
 }
 
 /**

@@ -9,6 +9,7 @@ const UserReminderList = require('../class/UserReminderList.js');
 
 const argumentValues = require('../enum/ArgumentValueEnum.js');
 const colors = require('../enum/EmbedColorEnum.js');
+const permissionLevels = require('../enum/PermissionLevelEnum.js');
 
 module.exports = {
 	name : 'reminder',
@@ -137,12 +138,27 @@ module.exports = {
 			name : 'list',
 			args : argumentValues.NONE,
 			usage : '',
-			description : 'List all reminders',
+			description : 'List all of your reminders',
 			async execute(msg) {
 				let user = msg.author;
 				let reminderList = new UserReminderList(msg, user);
 				await reminderList.send(msg.channel);
 			}
+		},
+		{
+			name : 'display',
+			permissionLevel : permissionLevels.BOT_OWNER,
+			args : argumentValues.NONE,
+			sub : [
+				{
+					name : 'all',
+				}
+			],
+			usage : '',
+			description : 'Display all reminders of all users',
+			/*async execute(msg) {
+
+			}*/
 		}
 	]
 };

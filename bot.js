@@ -4,9 +4,11 @@ const CronJob = require('cron').CronJob;
 const Discord = require('discord.js');
 const client = new Discord.Client();
 const chrono = require('chrono-node');
+
 const argumentValues = require('./enum/ArgumentValueEnum.js');
 const colors = require('./enum/EmbedColorEnum.js');
 const reactionEvents = require('./enum/ReactionEventEnum.js');
+const permissionLevels = require('./enum/PermissionLevelEnum.js');
 
 /// EXPORTS
 module.exports = {
@@ -250,13 +252,45 @@ let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
  * Sets up database space for a server
  * @param server
  */
-function setUpServer(server) {
+async function setUpServer(server) {
 	if (!Storage.servers.hasOwnProperty(server.id)) {
-		common.log('Added \'' + server.name + '\' to server list.');
 		Storage.servers[server.id] = {};
+		common.log('Added \'' + server.name + '\' to server list.');
 	}
-	Storage.servers[server.id].channels = Storage.servers[server.id].channels || {};
-	Storage.servers[server.id].disabledFeatures = Storage.servers[server.id].disabledFeatures || {};
+	let serverEntry = Storage.servers[server.id];
+	if (!serverEntry.hasOwnProperty('channels')) {
+		serverEntry.channels = {};
+	}
+	if (!serverEntry.hasOwnProperty('roles')) {
+		serverEntry.roles = {}
+	}
+	if (!serverEntry.roles.hasOwnProperty('owner')) {
+		try {
+			let createdRole = await server.createRole({
+				name : 'Wiktor Server Owner',
+				color : 'GREY',
+				mentionable : false
+			}, 'Wiktor Bot per-server permission system role setup.');
+			serverEntry.roles.owner = createdRole.id;
+		} catch(e) {
+			// error
+		}
+	}
+	if (!serverEntry.roles.hasOwnProperty('superuser')) {
+		try {
+			let createdRole = await server.createRole({
+				name : 'Wiktor Server Super User',
+				color : 'GREY',
+				mentionable : false
+			}, 'Wiktor Bot per-server permission system role setup.');
+			serverEntry.roles.superuser = createdRole.id;
+		} catch(e) {
+			// error
+		}
+	}
+	if (!serverEntry.hasOwnProperty('disabledFeatures')) {
+		serverEntry.disabledFeatures = {};
+	}
 	saveData();
 }
 
@@ -400,20 +434,28 @@ function getCommandName(msg) {
  * @returns {boolean} success
  */
 function handleCommand(msg) {
+	let user = msg.author;
 	// Filter out blocked users
-	if (isBlocked(msg.author)) {
-		common.debug('User is on blocked user list');
-		msg.channel.send('I\'m sorry, ' + msg.author + ', you\'ve been blocked from using me.');
+	if (isBlocked(user)) {
+		common.debug('User ' + user.getHandle() + ' is on blocked user list.');
+		msg.channel.send('I\'m sorry, ' + user + ', you\'ve been blocked from using me.');
 		return false;
 	}
 
 	// Create database space for the message author
-	if (!Storage.users.hasOwnProperty(msg.author.id)) setUpUser(msg, msg.author);
+	if (!Storage.users.hasOwnProperty(user.id)) setUpUser(msg, user);
 
-	const split = msg.content.slice(Config.prefix.length).split(/ +/);
-	const commandName = split[0].toLowerCase();
+	const commandName = getCommandName(msg);
 	common.debug('commandName: ' + commandName);
 	const command = client.commands.get(commandName);
+
+	let commandPermissionLevel = command.permissionLevel || permissionLevels.NONE;
+
+	if (user.getPermissionLevel() < commandPermissionLevel) {
+		common.debug('User ' + user.getHandle() + ' does not have the required permission level for that command.');
+		msg.channel.send('I\'m sorry, ' + user + ', you do not have permission to execute that command.');
+		return false;
+	}
 
 	let temp = msg.content.substring(Config.prefix.length + commandName.length);
 	let match = temp.match(/ +/);

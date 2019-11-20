@@ -10,7 +10,6 @@ class WaterTimer {
 	interval;
 	lastDate;
 	nextDate;
-	timer;
 	missed;
 
 	/**
@@ -91,7 +90,6 @@ class WaterTimer {
 	trigger() {
 		this.nextDate = new Date(new Date().valueOf() + this.interval * MINUTE_MULTIPLIER);
 		this.send().catch(console.error);
-		this.start();
 		common.saveWaterTimers();
 	}
 
@@ -99,18 +97,20 @@ class WaterTimer {
 	 * Starts the water timer
 	 */
 	start() {
+		if (common.runningWaterTimers.has(this.user.id)) {
+			throw 'Attempted to start already running water timer of user ' + this.user + '.';
+		}
 		let me = this;
 		let now = new Date();
 		let timer = setTimeout(function() {
 			me.trigger();
+			let subsequentInterval = setInterval(me.trigger, me.interval * MINUTE_MULTIPLIER);
+			common.runningWaterTimers.set(me.user.id, subsequentInterval)
 		}, this.nextDate - now);
 
-		common.runningWaterTimers.set(this.user.id, {
-			timer : timer,
-			started : now
-		});
+		common.runningWaterTimers.set(this.user.id, timer);
 
-		common.debug('Started water timer for ' + this.user.getHandle());
+		common.debug('Started water timer for ' + this.user + '.');
 	}
 
 	/**
@@ -123,7 +123,7 @@ class WaterTimer {
 			return false;
 		}
 		let timerEntry = common.runningWaterTimers.get(this.user.id);
-		clearInterval(timerEntry.timer);
+		clearInterval(timerEntry);
 		common.runningWaterTimers.delete(this.user.id);
 		common.debug('Stopped water timer of user ' + this.user + '.');
 		return true;

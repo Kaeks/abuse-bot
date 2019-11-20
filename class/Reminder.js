@@ -47,10 +47,7 @@ class Reminder {
 				me.trigger().catch(console.error);
 			}, diff);
 		}
-		common.runningReminders.set(this.id, {
-			timer : timer,
-			started : started
-		});
+		common.runningReminders.set(this.id, timer);
 		return true;
 	}
 
@@ -95,7 +92,7 @@ class Reminder {
 			return false;
 		}
 		let timerEntry = common.runningReminders.get(this.id);
-		clearInterval(timerEntry.timer);
+		clearInterval(timerEntry);
 		common.runningReminders.delete(this.id);
 		common.debug('Stopped timer of reminder with id ' + this.id + '.');
 		return true;
