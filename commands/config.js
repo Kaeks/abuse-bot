@@ -1,10 +1,10 @@
-const common = require('../common.js');
+const common = require('../common');
 const {
 	Discord,
 	Config, saveConfig,
 } = common;
-const argumentValues = require('../enum/ArgumentValueEnum.js');
-const colors = require('../enum/EmbedColorEnum.js');
+const argumentValues = require('../enum/ArgumentValueEnum');
+const colors = require('../enum/EmbedColorEnum');
 
 module.exports = {
 	name : 'config',

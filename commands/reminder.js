@@ -1,15 +1,15 @@
-const common = require('../common.js');
+const common = require('../common');
 const {
 	Discord, chrono
 } = common;
 
-const Reminder = require('../class/Reminder.js');
-const ReminderList = require('../class/ReminderList.js');
-const UserReminderList = require('../class/UserReminderList.js');
+const Reminder = require('../class/Reminder');
+const ReminderList = require('../class/ReminderList');
+const UserReminderList = require('../class/UserReminderList');
 
-const argumentValues = require('../enum/ArgumentValueEnum.js');
-const colors = require('../enum/EmbedColorEnum.js');
-const permissionLevels = require('../enum/PermissionLevelEnum.js');
+const argumentValues = require('../enum/ArgumentValueEnum');
+const colors = require('../enum/EmbedColorEnum');
+const permissionLevels = require('../enum/PermissionLevelEnum');
 
 module.exports = {
 	name : 'reminder',

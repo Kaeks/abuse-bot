@@ -1,8 +1,8 @@
-const common = require('../common.js');
+const common = require('../common');
 const { Discord } = common;
 
-const reactionEvents = require('../enum/ReactionEventEnum.js');
-const colors = require('../enum/EmbedColorEnum.js');
+const reactionEvents = require('../enum/ReactionEventEnum');
+const colors = require('../enum/EmbedColorEnum');
 
 const emojiPrev = '◀';
 const emojiNext = '▶';

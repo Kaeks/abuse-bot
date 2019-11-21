@@ -1,13 +1,13 @@
-const common = require('../common.js');
+const common = require('../common');
 const {
 	Discord,
 	Storage, saveData,
 } = common;
 
-const argumentValues = require('../enum/ArgumentValueEnum.js');
-const colors = require('../enum/EmbedColorEnum.js');
+const argumentValues = require('../enum/ArgumentValueEnum');
+const colors = require('../enum/EmbedColorEnum');
 
-const WaterTimer = require('../class/WaterTimer.js');
+const WaterTimer = require('../class/WaterTimer');
 
 // Default water interval (in minutes) to be set when people join the water club
 const DEFAULT_WATER_INTERVAL = 60;

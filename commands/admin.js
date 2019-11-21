@@ -1,10 +1,10 @@
-const common = require('../common.js');
+const common = require('../common');
 const {
 	Discord, fs
 } = common;
 const DUMP_DIRECTORY = 'dumps';
-const argumentValues = require('../enum/ArgumentValueEnum.js');
-const dumpTypes = require('../enum/DumpTypeEnum.js');
+const argumentValues = require('../enum/ArgumentValueEnum');
+const dumpTypes = require('../enum/DumpTypeEnum');
 
 module.exports = {
 	name : 'admin',

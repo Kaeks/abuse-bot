@@ -1,11 +1,12 @@
-const common = require('../common.js');
+const common = require('../common');
 const {
 	Discord,
 	Storage, saveData,
 	sendWednesday
 } = common;
-const argumentValues = require('../enum/ArgumentValueEnum.js');
-const colors = require('../enum/EmbedColorEnum.js');
+const argumentValues = require('../enum/ArgumentValueEnum');
+const colors = require('../enum/EmbedColorEnum');
+const serverFeatures = require('../enum/ServerFeatureEnum');
 
 module.exports = {
 	name : 'wednesday',
@@ -19,8 +20,7 @@ module.exports = {
 			execute (msg) {
 				if (checkDmOrGroup(msg)) return false;
 				let server = msg.guild;
-				Storage.servers[server.id].disabledFeatures.wednesday = false;
-				saveData();
+				server.enableFeature(serverFeatures.WEDNESDAY);
 				let embed = new Discord.RichEmbed()
 					.setColor(colors.GREEN)
 					.setTitle('Wednesday posting enabled!')
@@ -36,8 +36,7 @@ module.exports = {
 			execute (msg) {
 				if (checkDmOrGroup(msg)) return false;
 				let server = msg.guild;
-				Storage.servers[server.id].disabledFeatures.wednesday = true;
-				saveData();
+				server.disableFeature(serverFeatures.WEDNESDAY);
 				let embed = new Discord.RichEmbed()
 					.setColor(colors.GREEN)
 					.setTitle('Wednesday posting disabled!')

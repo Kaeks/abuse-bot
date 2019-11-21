@@ -1,7 +1,7 @@
-const common = require('../common.js');
+const common = require('../common');
 const { Discord, Storage } = common;
 
-const colors = require('../enum/EmbedColorEnum.js');
+const colors = require('../enum/EmbedColorEnum');
 
 const MINUTE_MULTIPLIER = 60 * 1000;
 

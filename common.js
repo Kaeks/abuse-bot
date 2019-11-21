@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { Discord, chrono, client } = require('./bot.js');
+const { Discord, chrono, client } = require('./bot');
 
 //// AMENDS
 Number.prototype.pad = function(size) {
@@ -16,6 +16,36 @@ Number.prototype.pad = function(size) {
 Discord.Guild.prototype.getDbEntry = function() {
 	if (!Storage.servers.hasOwnProperty(this.id)) throw 'Server with id ' + this.id + 'doesn\'t have an entry.';
 	return Storage.servers[this.id];
+};
+
+/**
+ * Enables a feature
+ * @param feature
+ */
+Discord.Guild.prototype.enableFeature = function(feature) {
+	if (!serverFeatures.includes(feature)) {
+		throw 'Feature ' + feature + ' does not exist.';
+	}
+	let serverEntry = this.getDbEntry();
+	if (!serverEntry.disabledFeatures.includes(feature)) {
+		serverEntry.disabledFeatures.push(feature);
+	}
+	saveData();
+};
+
+/**
+ * Disables a feature
+ * @param feature
+ */
+Discord.Guild.prototype.disableFeature = function(feature) {
+	if (!serverFeatures.includes(feature)) {
+		throw 'Feature ' + feature + ' does not exist.';
+	}
+	let serverEntry = this.getDbEntry();
+	serverEntry.disabledFeatures = serverEntry.disabledFeatures.filter(value => {
+		return value !== feature;
+	});
+	saveData();
 };
 
 /**
@@ -174,13 +204,14 @@ let runningReminders	= new Discord.Collection();
 let reactionListeners	= new Discord.Collection();
 
 // ENUM
-const colors = require('./enum/EmbedColorEnum.js');
-const months = require('./enum/MonthEnum.js');
-const daysOfWeek = require('./enum/WeekDayEnum.js');
-const argumentValues = require('./enum/ArgumentValueEnum.js');
-const reactionEvents = require('./enum/ReactionEventEnum.js');
-const gameTypes = require('./enum/GameTypeEnum.js');
-const permissionLevels = require('./enum/PermissionLevelEnum.js');
+const colors = require('./enum/EmbedColorEnum');
+const months = require('./enum/MonthEnum');
+const daysOfWeek = require('./enum/WeekDayEnum');
+const argumentValues = require('./enum/ArgumentValueEnum');
+const reactionEvents = require('./enum/ReactionEventEnum');
+const gameTypes = require('./enum/GameTypeEnum');
+const permissionLevels = require('./enum/PermissionLevelEnum');
+const serverFeatures = require('./enum/ServerFeatureEnum');
 
 //// EXPORTS
 module.exports = {
@@ -277,8 +308,8 @@ function saveFile(filePath, variable) {
 
 // SPECIAL R/W
 
-const Reminder = require('./class/Reminder.js');
-const WaterTimer = require('./class/WaterTimer.js');
+const Reminder = require('./class/Reminder');
+const WaterTimer = require('./class/WaterTimer');
 
 /**
  * Adds a reminder to the list

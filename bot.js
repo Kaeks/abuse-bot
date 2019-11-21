@@ -5,10 +5,10 @@ const Discord = require('discord.js');
 const client = new Discord.Client();
 const chrono = require('chrono-node');
 
-const argumentValues = require('./enum/ArgumentValueEnum.js');
-const colors = require('./enum/EmbedColorEnum.js');
-const reactionEvents = require('./enum/ReactionEventEnum.js');
-const permissionLevels = require('./enum/PermissionLevelEnum.js');
+const argumentValues = require('./enum/ArgumentValueEnum');
+const colors = require('./enum/EmbedColorEnum');
+const reactionEvents = require('./enum/ReactionEventEnum');
+const permissionLevels = require('./enum/PermissionLevelEnum');
 
 /// EXPORTS
 module.exports = {
@@ -16,7 +16,7 @@ module.exports = {
 };
 
 // IMPORTS
-const common = require('./common.js');
+const common = require('./common');
 const {
 	fs,
 	Config, Storage, Blocked, Deleted, Edited,
@@ -25,12 +25,16 @@ const {
 	sendWednesday
 } = common;
 
+const COMMAND_DIRECTORY = './commands';
+
 client.commands = new Discord.Collection();
-const commandFiles = fs.readdirSync('./commands').filter(file => file.match(/.js$/));
+const commandFiles = fs.readdirSync(COMMAND_DIRECTORY).filter(file => file.match(/.js$/));
 for (const file of commandFiles) {
-	const command = require('./commands/' + file);
+	const command = require(COMMAND_DIRECTORY + '/' + file);
 	client.commands.set(command.name, command);
 }
+
+console.log(client.commands);
 
 // BAD WORDS
 let badWordsText = fs.readFileSync('./storage/badwords.txt', 'utf-8');
@@ -51,7 +55,7 @@ client.on('ready', async () => {
 	common.log(now.toString());
 
 	for (let guild of client.guilds) {
-		setUpServer(guild[1]);
+		await setUpServer(guild[1]);
 	}
 
 	// WATER SETUP
@@ -260,9 +264,11 @@ async function setUpServer(server) {
 	let serverEntry = Storage.servers[server.id];
 	if (!serverEntry.hasOwnProperty('channels')) {
 		serverEntry.channels = {};
+		common.log('Added \'channels\' property to \'' + server.name + '\'.');
 	}
 	if (!serverEntry.hasOwnProperty('roles')) {
-		serverEntry.roles = {}
+		serverEntry.roles = {};
+		common.log('Added \'roles\' property to \'' + server.name + '\'.');
 	}
 	if (!serverEntry.roles.hasOwnProperty('owner')) {
 		try {
@@ -272,8 +278,10 @@ async function setUpServer(server) {
 				mentionable : false
 			}, 'Wiktor Bot per-server permission system role setup.');
 			serverEntry.roles.owner = createdRole.id;
+			common.log('Added server owner role to \'' + server.name + '\'.');
 		} catch(e) {
 			// error
+			console.error();
 		}
 	}
 	if (!serverEntry.roles.hasOwnProperty('superuser')) {
@@ -284,12 +292,15 @@ async function setUpServer(server) {
 				mentionable : false
 			}, 'Wiktor Bot per-server permission system role setup.');
 			serverEntry.roles.superuser = createdRole.id;
+			common.log('Added server superuser role to \'' + server.name + '\'.');
 		} catch(e) {
 			// error
+			console.error(e);
 		}
 	}
 	if (!serverEntry.hasOwnProperty('disabledFeatures')) {
-		serverEntry.disabledFeatures = {};
+		serverEntry.disabledFeatures = [];
+		common.log('Added \'disabledFeatures\' property to \'' + server.name + '\'.');
 	}
 	saveData();
 }
@@ -319,10 +330,11 @@ function setUpUser(msg, user) {
  * @param msg
  * @param suffix
  * @param command
+ * @param parent
  * @param commandChain
  * @returns {boolean} success
  */
-function findSubCommand(msg, suffix, command, commandChain = []) {
+function findSubCommand(msg, suffix, command, parent = undefined, commandChain = []) {
 	let localCommandChain = commandChain.slice();
 	localCommandChain.push(command);
 	let commandString = common.combineCommandChain(localCommandChain);
@@ -359,9 +371,21 @@ function findSubCommand(msg, suffix, command, commandChain = []) {
 		if (subIndex >= 0) {
 			let temp = suffix.substring(firstArg.length);
 			let match = temp.match(/ +/);
+			let subCommand = command.sub(subIndex);
+
+			let subCommandPermissionLevel = subCommand.permissionLevel || parent.permissionLevel;
+
+			let user = msg.author;
+
+			if (user.getPermissionLevel(msg) < subCommandPermissionLevel) {
+				common.debug('User ' + user.getHandle() + ' does not have the required permission level for that sub-command.');
+				msg.channel.send('I\'m sorry, ' + user + ', you do not have permission to execute that sub-command.');
+				return false;
+			}
 
 			let newSuffix = match !== null ? temp.substring(match[0].length) : null;
-			return findSubCommand(msg, newSuffix, command.sub[subIndex], localCommandChain);
+
+			return findSubCommand(msg, newSuffix, subCommand, command, localCommandChain);
 		} else if (command.args === argumentValues.REQUIRED || command.args === argumentValues.OPTIONAL) {
 			isValidUse = true;
 		}
@@ -451,7 +475,7 @@ function handleCommand(msg) {
 
 	let commandPermissionLevel = command.permissionLevel || permissionLevels.NONE;
 
-	if (user.getPermissionLevel() < commandPermissionLevel) {
+	if (user.getPermissionLevel(msg) < commandPermissionLevel) {
 		common.debug('User ' + user.getHandle() + ' does not have the required permission level for that command.');
 		msg.channel.send('I\'m sorry, ' + user + ', you do not have permission to execute that command.');
 		return false;

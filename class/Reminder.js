@@ -1,8 +1,8 @@
-const common = require('../common.js');
+const common = require('../common');
 const { Discord, client } = common;
 let { reminders } = common;
 
-const reactionEvents = require('../enum/ReactionEventEnum.js');
+const reactionEvents = require('../enum/ReactionEventEnum');
 
 class Reminder {
 	id;

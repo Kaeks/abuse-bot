@@ -1,5 +1,5 @@
-const common = require('../common.js');
-const ReminderList = require('./ReminderList.js');
+const common = require('../common');
+const ReminderList = require('./ReminderList');
 
 class UserReminderList extends ReminderList {
 	user;
