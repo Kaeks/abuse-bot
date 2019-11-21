@@ -224,6 +224,7 @@ module.exports = {
 	updatePresence, findChannelOfMsgId, parseDate,
 	sendWednesday,
 	combineCommandChain, getCommandHelp, getFullHelpEmbed,
+	getCommandHelp2,
 	waterTimers, runningWaterTimers,
 	loadWaterTimers, addWaterTimer, startAllWaterTimers,
 	reminders, runningReminders, getRemindersOfUser,
@@ -231,6 +232,9 @@ module.exports = {
 	getBooleanValue, getUsers, testBooleanValue,
 	reactionListeners, addReactionListener, REMINDER_SIGNUP_EMOJI
 };
+
+// CLASS IMPORTS
+const Command = require('./class/Command');
 
 //// METHODS
 // CONSOLE
@@ -601,8 +605,22 @@ function getHelpRow(commandString, usage, description = undefined) {
 	return description === undefined ? base : base + '> ' + description + '\n';
 }
 
-function getCommandHelp2(command) {
+function getHelpRow2(command, usage, description = '') {
+	let base = '`' + Config.prefix + combineCommandChain(command.getCommandChain()) + ' ' + usage + '`' + '\n';
+	return description === '' ? base : base + '> ' + description + '\n';
+}
 
+function getCommandHelp2(command) {
+	let helpText = '';
+	for (let docEntry of command.doc) {
+		helpText+= getHelpRow2(command, docEntry.usage, docEntry.description);
+	}
+	if (command.sub.size > 1) {
+		command.sub.forEach(subCommand => {
+			helpText += getCommandHelp2(subCommand);
+		});
+	}
+	return helpText;
 }
 
 /**
@@ -656,8 +674,12 @@ function getCommandHelp(command, commandChain = []) {
  */
 function getFullHelpEmbed(msg, embed) {
 	const { commands } = msg.client;
-	commands.forEach(function (value, key) {
-		embed.addField(key, getCommandHelp(value));
+	commands.forEach(function (command, name) {
+		if (command instanceof Command) {
+			embed.addField(command.name, getCommandHelp2(command))
+		} else {
+			embed.addField(name, getCommandHelp(command));
+		}
 	});
 }
 

@@ -1,10 +1,10 @@
-const common = require('../common.js');
+const common = require('../common');
 const { Discord } = common;
 
-const DocumentationEntry = require('./DocumentationEntry.js');
+const DocumentationEntry = require('./DocumentationEntry');
 
-const argumentValues = require('../enum/ArgumentValueEnum.js');
-const permissionLevels = require('../enum/PermissionLevelEnum.js');
+const argumentValues = require('../enum/ArgumentValueEnum');
+const permissionLevels = require('../enum/PermissionLevelEnum');
 
 class Command {
 	name;
@@ -41,6 +41,14 @@ class Command {
 	 */
 	addSub(subCommand) {
 		subCommand.setParent(this);
+		// Check if the permission level is lower than the parent's permission level and adjust in case
+		if (this.permissionLevel > subCommand.permissionLevel) {
+			common.info(
+				'Permission level of command \'' + common.combineCommandChain(subCommand.getCommandChain()) +
+				'\' had to be adjusted from ' + subCommand.permissionLevel + ' to ' + this.permissionLevel + '.'
+			);
+			subCommand.permissionLevel = this.permissionLevel;
+		}
 		this.sub.set(subCommand.name, subCommand);
 		return this;
 	}
@@ -63,6 +71,26 @@ class Command {
 	 */
 	setExecute(fn) {
 		this.execute = fn;
+		return this;
+	}
+
+	/**
+	 * Gets the list of commands leading up to this (sub-)command,
+	 * but... well... it's just this one!
+	 * @param list
+	 * @returns {Array}
+	 */
+	getCommandChain(list = []) {
+		list.unshift(this);
+		return list;
+	}
+
+	/**
+	 * Gets the root command of this (sub-)command,
+	 * but... well... that is this one!
+	 * @returns {Command}
+	 */
+	getRootCommand() {
 		return this;
 	}
 

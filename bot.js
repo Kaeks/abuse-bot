@@ -25,6 +25,8 @@ const {
 	sendWednesday
 } = common;
 
+const Command = require('./class/Command');
+
 const COMMAND_DIRECTORY = './commands';
 
 client.commands = new Discord.Collection();
@@ -337,7 +339,6 @@ function setUpUser(msg, user) {
 function findSubCommand(msg, suffix, command, parent = undefined, commandChain = []) {
 	let localCommandChain = commandChain.slice();
 	localCommandChain.push(command);
-	let commandString = common.combineCommandChain(localCommandChain);
 
 	// Variable for determining whether a (sub-)command can be executed with the suffix or not
 	let isValidUse = false;
@@ -393,6 +394,7 @@ function findSubCommand(msg, suffix, command, parent = undefined, commandChain =
 
 	// If the use is valid, execute it
 	// If the use is not valid, display help
+	let commandString = common.combineCommandChain(localCommandChain);
 	if (isValidUse) {
 		let suffixString = suffix == null ? '' : ' with suffix: \'' + suffix + '\'';
 		common.log('User ' + msg.author.getHandle() + ' issued command \'' + commandString + '\'' + suffixString + '.');
@@ -411,8 +413,12 @@ function findSubCommand(msg, suffix, command, parent = undefined, commandChain =
 	} else {
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.GREEN)
-			.setTitle('Help for ' + commandString)
-			.setDescription(common.getCommandHelp(command, commandChain));
+			.setTitle('Help for ' + commandString);
+		if (command instanceof Command) {
+			embed.setDescription(common.getCommandHelp2(command))
+		} else {
+			embed.setDescription(common.getCommandHelp(command, commandChain));
+		}
 		msg.channel.send({ embed: embed });
 	}
 	return false;

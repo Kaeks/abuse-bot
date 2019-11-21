@@ -1,4 +1,6 @@
+const common = require('../common');
 const Command = require('./Command.js');
+
 const argumentValues = require('../enum/ArgumentValueEnum.js');
 const permissionLevels = require('../enum/PermissionLevelEnum.js');
 
@@ -21,10 +23,6 @@ class SubCommand extends Command {
 	 */
 	setParent(command) {
 		this.parent = command;
-		// Check if the permission level is lower than the parent's permission level and adjust in case
-		if (this.parent.permissionLevel > this.permissionLevel) {
-			this.permissionLevel = this.parent.permissionLevel;
-		}
 	}
 
 	/**
@@ -35,12 +33,17 @@ class SubCommand extends Command {
 	getCommandChain(list = []) {
 		list.unshift(this);
 		if (this.hasOwnProperty('parent')) {
+			console.log(this);
 			return this.parent.getCommandChain(list);
 		}
 		return list;
 	}
 
-	getRootCommand(){
+	/**
+	 * Gets the root command of this (sub-)command
+	 * @returns {Command}
+	 */
+	getRootCommand() {
 		if (this.hasOwnProperty('parent')) {
 			return this.parent.getRootCommand();
 		}
