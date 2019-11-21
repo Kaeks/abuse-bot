@@ -601,6 +601,10 @@ function getHelpRow(commandString, usage, description = undefined) {
 	return description === undefined ? base : base + '> ' + description + '\n';
 }
 
+function getCommandHelp2(command) {
+
+}
+
 /**
  * Returns a list of possible uses of a command as a string
  * @param {Object} command
