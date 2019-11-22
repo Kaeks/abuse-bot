@@ -49,14 +49,6 @@ Discord.Guild.prototype.disableFeature = function(feature) {
 };
 
 /**
- * Gets the Owner role
- */
-Discord.Guild.prototype.getOwnerRole = function() {
-	let serverEntry = this.getDbEntry();
-
-};
-
-/**
  * Returns the DM Channel of a user. Creates one if it does not exist.
  * @returns {Promise<DMChannel|undefined>}
  */
@@ -233,7 +225,7 @@ module.exports = {
 	loadFile, saveFile,
 	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited, saveReminders, saveWaterTimers,
 	debug, log, info, warn,
-	updatePresence, findChannelOfMsgId, parseDate,
+	updatePresence, parseDate,
 	sendWednesday,
 	combineCommandChain, getCommandHelp, getFullHelpEmbed,
 	getCommandHelp2,
@@ -348,6 +340,24 @@ async function loadReminders() {
 }
 
 /**
+ * Helper method to get a message from a reminder message entry
+ * @param msgEntry
+ * @returns {Promise<*>}
+ */
+async function getReminderMsg(msgEntry) {
+	let msgId = msgEntry.id;
+	let msgChannelEntry = msgEntry.channel;
+	if (msgChannelEntry.type === 'dm') {
+		if (!msgChannelEntry.hasOwnProperty('recipient')) {
+			msgChannelEntry.recipient = {};
+			let recipient = await findRecipientOfDmChannelId(msgChannelEntry.id);
+			msgChannelEntry.recipient.id = recipient.id;
+		}
+	}
+	return await getMessageInChannelEntry(msgId, msgChannelEntry);
+}
+
+/**
  * Gets a collection of all reminders including its real message values
  * @returns {Promise<Discord.Collection<*,*>>}
  */
@@ -357,18 +367,14 @@ async function readReminders() {
 	for (let reminderEntry of Reminders) {
 		let jsonReminder = reminderEntry[1];
 
-		let userMsgId = jsonReminder.userMsg.id;
-		let userMsgChannelId = jsonReminder.userMsg.channel.id;
-		let userMsg = await getMessageInChannelId(userMsgId, userMsgChannelId);
+		let userMsg = await getReminderMsg(jsonReminder.userMsg);
 
 		let botMsg;
 
 		if (jsonReminder.botMsg == null) {
 			botMsg = null;
 		} else {
-			let botMsgId = jsonReminder.botMsg.id;
-			let botMsgChannelId = jsonReminder.botMsg.channel.id;
-			botMsg = await getMessageInChannelId(botMsgId, botMsgChannelId);
+			botMsg = await getReminderMsg(jsonReminder.botMsg);
 		}
 
 		let date = new Date(jsonReminder.date);
@@ -400,26 +406,44 @@ function formatReminders() {
 	let shortReminders = new Discord.Collection();
 	reminders.forEach((reminder, id) => {
 
-		let botMsg = reminder.botMsg == null ? null : {
-			id : reminder.botMsg.id,
+		let botMsg;
+
+		if (reminder.botMsg != null) {
+			botMsg = {
+				id : reminder.botMsg.id,
+				channel : {
+					id : reminder.botMsg.channel.id,
+					type : reminder.botMsg.channel.type
+				}
+			};
+			if (botMsg.channel.type === 'dm') {
+				botMsg.channel.recipient = {
+					id : reminder.botMsg.channel.recipient.id
+				};
+			}
+		} else {
+			botMsg = null;
+		}
+
+		let userMsg = {
+			id : reminder.userMsg.id,
 			channel : {
-				id : reminder.botMsg.channel.id,
-				type : reminder.botMsg.channel.type
+				id : reminder.userMsg.channel.id,
+				type : reminder.userMsg.channel.type
 			}
 		};
+		if (userMsg.channel.type === 'dm') {
+			userMsg.channel.recipient = {
+				id : reminder.userMsg.channel.recipient.id
+			};
+		}
 
 		let shortUsers = reminder.users.map(val => val.id);
 
 		let shortReminder = {
 			id : id,
 			users : shortUsers,
-			userMsg : {
-				id : reminder.userMsg.id,
-				channel : {
-					id : reminder.userMsg.channel.id,
-					type : reminder.userMsg.channel.type
-				}
-			},
+			userMsg : userMsg,
 			botMsg : botMsg,
 			date : reminder.date,
 			task : reminder.task
@@ -579,8 +603,51 @@ function parseDate(date) {
 	return `${dowString}, ${monthString}. ${getNumberWithOrdinal(day)} ${hours.pad(2)}:${minutes.pad(2)}`;
 }
 
-async function getMessageInChannelId(msgId, channelId) {
-	return await getMessageInChannel(msgId, client.channels.get(channelId));
+/**
+ * Finds the recipient of a DM channel
+ * @param dmChannelId
+ * @returns {Promise<*>}
+ */
+async function findRecipientOfDmChannelId(dmChannelId) {
+	let dmChannels = new Discord.Collection();
+
+	let users = getUsers();
+
+	for (const userEntry of users) {
+		let user = userEntry[1];
+		let dmChannel = await user.getDmChannel();
+		dmChannels.set(dmChannel.id, dmChannel);
+	}
+
+	if (!dmChannels.has(dmChannelId)) {
+		throw 'DM channel with id \'' + dmChannelId + '\' could not be found.';
+	}
+
+	return dmChannels.get(dmChannelId).recipient;
+}
+
+/**
+ * Gets a message in a channel entry, with
+ * @param msgId
+ * @param {Object} channelEntry
+ * @returns {Promise<*>}
+ */
+async function getMessageInChannelEntry(msgId, channelEntry) {
+	let channel;
+	if (!client.channels.has(channelEntry.id)) {
+		if (channelEntry.type !== 'dm') {
+			throw 'I don\'t have the channel with id \'' + channelEntry.id + '\' cached.';
+		}
+		if (!channelEntry.hasOwnProperty('recipient')) {
+			throw 'The channel with id \'' + channelEntry.id + '\' is a DM channel but has no recipient.';
+		}
+		let recipientId = channelEntry.recipient.id;
+		let user = client.users.get(recipientId);
+		channel = await user.getDmChannel();
+	} else {
+		channel = client.channels.get(channelEntry.id);
+	}
+	return await getMessageInChannel(msgId, channel);
 }
 
 async function getMessageInChannel(msgId, channel) {
