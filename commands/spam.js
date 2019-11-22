@@ -1,14 +1,14 @@
 const common = require('../common');
 const { Discord } = common;
+
+const Command = require('../class/Command.js');
+
 const argumentValues = require('../enum/ArgumentValueEnum');
 const colors = require('../enum/EmbedColorEnum');
 
-module.exports = {
-	name : 'spam',
-	args : argumentValues.REQUIRED,
-	usage : '<user>',
-	description : 'Spam <user>\'s DMs.',
-	execute(msg) {
+let commandSpam = new Command('spam', argumentValues.REQUIRED)
+	.addDoc('<user>', 'Spam <user>\'s DMs.')
+	.setExecute(msg => {
 		if (msg.channel.type === 'dm') {
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.RED)
@@ -29,5 +29,6 @@ module.exports = {
 				.setFooter(msg.author.username + ' has sent you some SPAM.');
 			msg.mentions.users.first().send({ embed: embed });
 		}
-	}
-};
+	});
+
+module.exports = commandSpam;

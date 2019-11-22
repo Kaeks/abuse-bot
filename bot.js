@@ -375,14 +375,9 @@ function setUpUser(msg, user) {
  * @param msg
  * @param suffix
  * @param command
- * @param parent
- * @param commandChain
  * @returns {boolean} success
  */
-function findSubCommand(msg, suffix, command, parent = undefined, commandChain = []) {
-	let localCommandChain = commandChain.slice();
-	localCommandChain.push(command);
-
+function findSubCommand(msg, suffix, command) {
 	// Variable for determining whether a (sub-)command can be executed with the suffix or not
 	let isValidUse = false;
 
@@ -397,31 +392,16 @@ function findSubCommand(msg, suffix, command, parent = undefined, commandChain =
 		let splitList = suffix.split(/ +/);
 		let firstArg = splitList[0];
 
-		// subIndex is the index where the sub-command lies within the list of commands
-		let subIndex = -1;
-
-		// Check whether the is a sub-command for firstArg
-		if (command.hasOwnProperty('sub')) {
-			for (let i = 0; i < command.sub.length; i++) {
-				if (command.sub[i].name === firstArg.toLowerCase()) {
-					subIndex = i;
-					break;
-				}
-			}
-		}
-
 		// If there is a sub-command, go through to it and look recursively
 		// If there is no sub-command and the current command accepts / requires arguments, continue with execution
-		if (subIndex >= 0) {
+		if (command.sub.has(firstArg)) {
 			let temp = suffix.substring(firstArg.length);
 			let match = temp.match(/ +/);
-			let subCommand = command.sub(subIndex);
-
-			let subCommandPermissionLevel = subCommand.permissionLevel || parent.permissionLevel;
+			let subCommand = command.sub.get(firstArg);
 
 			let user = msg.author;
 
-			if (user.getPermissionLevel(msg) < subCommandPermissionLevel) {
+			if (user.getPermissionLevel(msg) < subCommand.permissionLevel) {
 				common.debug('User ' + user.getHandle() + ' does not have the required permission level for that sub-command.');
 				msg.channel.send('I\'m sorry, ' + user + ', you do not have permission to execute that sub-command.');
 				return false;
@@ -429,7 +409,7 @@ function findSubCommand(msg, suffix, command, parent = undefined, commandChain =
 
 			let newSuffix = match !== null ? temp.substring(match[0].length) : null;
 
-			return findSubCommand(msg, newSuffix, subCommand, command, localCommandChain);
+			return findSubCommand(msg, newSuffix, subCommand);
 		} else if (command.args === argumentValues.REQUIRED || command.args === argumentValues.OPTIONAL) {
 			isValidUse = true;
 		}
@@ -437,7 +417,7 @@ function findSubCommand(msg, suffix, command, parent = undefined, commandChain =
 
 	// If the use is valid, execute it
 	// If the use is not valid, display help
-	let commandString = common.combineCommandChain(localCommandChain);
+	let commandString = common.combineCommandChain(command.getCommandChain());
 	if (isValidUse) {
 		let suffixString = suffix == null ? '' : ' with suffix: \'' + suffix + '\'';
 		common.log('User ' + msg.author.getHandle() + ' issued command \'' + commandString + '\'' + suffixString + '.');

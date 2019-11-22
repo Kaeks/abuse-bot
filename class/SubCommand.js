@@ -33,7 +33,6 @@ class SubCommand extends Command {
 	getCommandChain(list = []) {
 		list.unshift(this);
 		if (this.hasOwnProperty('parent')) {
-			console.log(this);
 			return this.parent.getCommandChain(list);
 		}
 		return list;

@@ -41,14 +41,6 @@ class Command {
 	 */
 	addSub(subCommand) {
 		subCommand.setParent(this);
-		// Check if the permission level is lower than the parent's permission level and adjust in case
-		if (this.permissionLevel > subCommand.permissionLevel) {
-			common.info(
-				'Permission level of command \'' + common.combineCommandChain(subCommand.getCommandChain()) +
-				'\' had to be adjusted from ' + subCommand.permissionLevel + ' to ' + this.permissionLevel + '.'
-			);
-			subCommand.permissionLevel = this.permissionLevel;
-		}
 		this.sub.set(subCommand.name, subCommand);
 		return this;
 	}

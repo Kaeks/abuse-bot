@@ -1,20 +1,15 @@
 const common = require('../common');
 const { Discord, Config } = common;
+
+const Command = require('../class/Command');
+
 const argumentValues = require('../enum/ArgumentValueEnum');
 const colors = require('../enum/EmbedColorEnum');
 
-module.exports = {
-	name : 'help',
-	args : argumentValues.OPTIONAL,
-	usage : [
-		'',
-		'[command]'
-	],
-		description : [
-		'Show help for all commands.',
-		'Show help for <command>'
-	],
-	async execute(msg, suffix) {
+let commandHelp = new Command('help', argumentValues.OPTIONAL)
+	.addDoc('', 'Show help for all commands.')
+	.addDoc('[command]', 'Show help for [command].')
+	.setExecute(async (msg, suffix) => {
 		const { commands } = msg.client;
 
 		let embed = new Discord.RichEmbed().setColor(colors.GREEN);
@@ -34,5 +29,6 @@ module.exports = {
 				.setDescription(common.getCommandHelp(command));
 			msg.channel.send({ embed: embed });
 		}
-	}
-};
+	});
+
+module.exports = commandHelp;

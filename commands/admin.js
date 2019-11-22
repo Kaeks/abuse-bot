@@ -1,78 +1,66 @@
 const common = require('../common');
-const {
-	Discord, fs
-} = common;
+const { Discord, fs } = common;
+
+const Command = require('../class/Command');
+const SubCommand = require('../class/SubCommand');
+
 const DUMP_DIRECTORY = 'dumps';
+
 const argumentValues = require('../enum/ArgumentValueEnum');
+const permissionLevels = require('../enum/PermissionLevelEnum');
 const dumpTypes = require('../enum/DumpTypeEnum');
 
-module.exports = {
-	name : 'admin',
-	args : argumentValues.NULL,
-	sub : [
-		{
-			name : 'clean',
-			args : argumentValues.NONE,
-			usage: [ '' ],
-			description : [ 'I clean up after myself.' ],
-			async execute(msg) {
-				let channel = msg.channel;
-				let client = msg.client;
-				let messagesByBot = await getMessages(channel, function(element) {
-					return element.author.id === client.user.id;
-				});
-				console.info('Deleting ' + messagesByBot.size + ' of my messages.');
-				messagesByBot.forEach(function(value) {
-					value.delete().catch(console.error);
-				});
-			}
-		},
-		{
-			name : 'dump',
-			args : argumentValues.NULL,
-			sub : [
-				{
-					name : 'dm',
-					args : argumentValues.OPTIONAL,
-					usage : [ '[userId]' ],
-					description : [ 'Dumps all direct messages with a user. This user if ID is not specified.' ],
-					async execute(msg, suffix) {
-						await createDump(msg, suffix, dumpTypes.DM);
-					}
-				},
-				{
-					name : 'channel',
-					args : argumentValues.OPTIONAL,
-					usage : [ '[id]' ],
-					description : [ 'Dumps all messages in a channel. This channel if ID is not specified.' ],
-					async execute(msg, suffix) {
-						let channel = suffix == null ? msg.channel : client.channels.get(suffix);
-						let type = channel.type === 'dm' ? dumpTypes.DM : dumpTypes.CHANNEL;
-						await createDump(msg, suffix, type);
-					}
-				},
-				{
-					name : 'server',
-					args : argumentValues.OPTIONAL,
-					usage : [ '[id]' ],
-					description : [ 'Dumps all messages in a server. This server if ID is not specified.' ],
-					async execute(msg, suffix) {
-						await createDump(msg, suffix, dumpTypes.SERVER);
-					}
-				},
-				{
-					name : 'all',
-					args : argumentValues.NONE,
-					usage : [ '' ],
-					description : [ 'Dumps all messages.' ],
-					async execute(msg, suffix) {
-						await createDump(msg, suffix, dumpTypes.ALL)
-					}
-				}
-			]
-		}
-	],
-};
+let commandAdminClean = new SubCommand('clean', argumentValues.NONE, permissionLevels.SERVER_SUPERUSER)
+	.addDoc('', 'I clean up after myself.')
+	.setExecute(async msg => {
+		let channel = msg.channel;
+		let client = msg.client;
+		let messagesByBot = await getMessages(channel, function(element) {
+			return element.author.id === client.user.id;
+		});
+		console.info('Deleting ' + messagesByBot.size + ' of my messages.');
+		messagesByBot.forEach(function(value) {
+			value.delete().catch(console.error);
+		});
+});
+
+let commandAdminDumpDm = new SubCommand('dm', argumentValues.OPTIONAL, permissionLevels.BOT_SUPERUSER)
+	.addDoc('[userId]', 'Dumps all direct messages with a user. This user if ID is not specified.')
+	.setExecute(async (msg, suffix) => {
+		await createDump(msg, suffix, dumpTypes.DM);
+	});
+
+let commandAdminDumpChannel = new SubCommand('channel', argumentValues.OPTIONAL)
+	.addDoc('[id]', 'Dumps all messages in a channel. This channel if ID is not specified.')
+	.setExecute(async (msg, suffix) => {
+		let channel = suffix == null ? msg.channel : client.channels.get(suffix);
+		let type = channel.type === 'dm' ? dumpTypes.DM : dumpTypes.CHANNEL;
+		await createDump(msg, suffix, type);
+	});
+
+let commandAdminDumpServer = new SubCommand('server', argumentValues.OPTIONAL)
+	.addDoc('[id]', 'Dumps all messages in a server. This server if ID is not specified.')
+	.setExecute(async (msg, suffix) => {
+		await createDump(msg, suffix, dumpTypes.SERVER);
+	});
+
+let commandAdminDumpAll = new SubCommand('all', argumentValues.NONE, permissionLevels.BOT_OWNER)
+	.addDoc('', 'Dumps all messages.')
+	.setExecute(async (msg, suffix) => {
+		await createDump(msg, suffix, dumpTypes.ALL)
+	});
+
+let commandAdminDump = new SubCommand('dump', argumentValues.NULL)
+	.addSub(commandAdminDumpDm)
+	.addSub(commandAdminDumpChannel)
+	.addSub(commandAdminDumpServer)
+	.addSub(commandAdminDumpAll);
+
+let commandAdmin = new Command('admin', argumentValues.NULL, permissionLevels.SERVER_SUPERUSER)
+	.addSub(commandAdminClean)
+	.addSub(commandAdminDump);
+
+module.exports = commandAdmin;
 
 async function createDump(msg, suffix, type) {
 	if (Object.values(dumpTypes).indexOf(type) === -1) throw `Invalid type ${type}.`;
