@@ -108,28 +108,6 @@ class Reminder {
 		common.debug('Deleted reminder with id ' + this.id + '.');
 	}
 
-	async getFixedMessage(msgId) {
-		let foundChannel = await common.findChannelOfMsgId(msgId);
-		return {
-			id : msgId,
-			channel : {
-				id : foundChannel.id,
-				type : foundChannel.type
-			}
-		}
-	}
-
-	async fix() {
-		if (this.userMsg.hasOwnProperty('channel')) {
-			this.userMsg = await this.getFixedMessage(this.userMsg);
-		}
-		if (!this.botMsg.hasOwnProperty('channel')) {
-			this.botMsg = await this.getFixedMessage(this.botMsg);
-		}
-		reminders.set(this.id, this);
-		common.saveReminders();
-	}
-
 	/**
 	 * Starts the reminder timer
 	 * @returns {boolean}
@@ -144,11 +122,6 @@ class Reminder {
 		if (this.botMsg == null) {
 			common.info('Reminder with id ' + this.id + ' doesn\'t have a bot message.');
 			return true;
-		}
-
-		if (typeof this.botMsg === 'string') {
-			// migration
-			await this.fix
 		}
 
 		let channel = client.channels.get(this.botMsg.channel.id);

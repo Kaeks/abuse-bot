@@ -182,7 +182,8 @@ class ReminderList {
 		let subList = getSubList(this.reminders.simplify(), this.curPage);
 		let listIterator = 0;
 		subList.forEach((reminder, index) => {
-			tempText += emojiNums[listIterator] + reminder.getSingleLine(index);
+			if (this.userMsg.channel !== 'dm') tempText += '(' + emojiNums[listIterator] + ')';
+			tempText += reminder.getSingleLine(index);
 			listIterator++;
 			if (index !== subList.lastKey) tempText += '\n';
 		});

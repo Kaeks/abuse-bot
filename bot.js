@@ -55,8 +55,9 @@ client.on('ready', async () => {
 	let now = new Date();
 	common.log(now.toString());
 
-	for (let guild of client.guilds) {
-		await setUpServer(guild[1]);
+	for (const guildEntry of client.guilds) {
+		let guild = guildEntry[1];
+		await setUpServer(guild);
 	}
 
 	// WATER SETUP
