@@ -49,6 +49,14 @@ Discord.Guild.prototype.disableFeature = function(feature) {
 };
 
 /**
+ * Gets the Owner role
+ */
+Discord.Guild.prototype.getOwnerRole = function() {
+	let serverEntry = this.getDbEntry();
+
+};
+
+/**
  * Returns the DM Channel of a user. Creates one if it does not exist.
  * @returns {Promise<DMChannel|undefined>}
  */
@@ -96,20 +104,24 @@ Discord.User.prototype.getDbEntry = function() {
 	return Storage.users[this.id];
 };
 
+/**
+ * Returns the permission level of the user where msg is located
+ * @param msg
+ * @returns {number}
+ */
 Discord.User.prototype.getPermissionLevel = function(msg) {
 	let dbEntry = this.getDbEntry();
-	let permissionLevel = dbEntry.permissionLevel ? dbEntry.permissionLevel : 0;
-	if (permissionLevel === permissionLevels.NONE) {
-		if (msg.channel.type === 'text') {
-			let server = msg.channel.guild;
-			let serverDbEntry = server.getDbEntry();
-			let serverOwnerRole = msg.channel.guild.roles.get(serverDbEntry.roles.owner);
-			let serverSuperUserRole = msg.channel.guild.roles.get(serverDbEntry.roles.superuser);
-			if (msg.member.roles.has(serverOwnerRole.id)) return permissionLevels.SERVER_OWNER;
-			if (msg.member.roles.has(serverSuperUserRole.id)) return permissionLevels.SERVER_SUPERUSER;
-		}
+	if (this === getOwner()) return permissionLevels.BOT_OWNER;
+	if (dbEntry.permissionLevel) return dbEntry.permissionLevel;
+	if (msg.channel.type === 'text') {
+		let server = msg.channel.guild;
+		let serverDbEntry = server.getDbEntry();
+		let serverOwnerRole = msg.channel.guild.roles.get(serverDbEntry.roles.owner);
+		let serverSuperUserRole = msg.channel.guild.roles.get(serverDbEntry.roles.superuser);
+		if (msg.member.roles.has(serverOwnerRole.id)) return permissionLevels.SERVER_OWNER;
+		if (msg.member.roles.has(serverSuperUserRole.id)) return permissionLevels.SERVER_SUPERUSER;
 	}
-	return permissionLevel;
+	return permissionLevels.NONE;
 };
 
 /**

@@ -9,6 +9,7 @@ const argumentValues = require('./enum/ArgumentValueEnum');
 const colors = require('./enum/EmbedColorEnum');
 const reactionEvents = require('./enum/ReactionEventEnum');
 const permissionLevels = require('./enum/PermissionLevelEnum');
+const roleNames = require('./enum/RoleNameEnum');
 
 /// EXPORTS
 module.exports = {
@@ -35,8 +36,6 @@ for (const file of commandFiles) {
 	const command = require(COMMAND_DIRECTORY + '/' + file);
 	client.commands.set(command.name, command);
 }
-
-console.log(client.commands);
 
 // BAD WORDS
 let badWordsText = fs.readFileSync('./storage/badwords.txt', 'utf-8');
@@ -255,6 +254,34 @@ let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
 
 //// METHODS
 /**
+ * Looks for a role with a specific name on a server
+ * @param server
+ * @param {String} roleName
+ * @return {*}
+ */
+function findServerRoleFromName(server, roleName) {
+	return server.roles.find(role => role.name === roleName);
+}
+
+/**
+ * Looks for an existing Wiktor server owner role
+ * @param server
+ * @return {*}
+ */
+function findServerOwnerRole(server) {
+	return findServerRoleFromName(server, roleNames.SERVER_OWNER);
+}
+
+/**
+ * Looks for an existing Wiktor server superuser role
+ * @param server
+ * @return {*}
+ */
+function findServerSuperUserRole(server) {
+	return findServerRoleFromName(server, roleNames.SERVER_SUPERUSER);
+}
+
+/**
  * Sets up database space for a server
  * @param server
  */
@@ -273,31 +300,47 @@ async function setUpServer(server) {
 		common.log('Added \'roles\' property to \'' + server.name + '\'.');
 	}
 	if (!serverEntry.roles.hasOwnProperty('owner')) {
-		try {
-			let createdRole = await server.createRole({
-				name : 'Wiktor Server Owner',
-				color : 'GREY',
-				mentionable : false
-			}, 'Wiktor Bot per-server permission system role setup.');
-			serverEntry.roles.owner = createdRole.id;
+		let role;
+		let foundRole = findServerOwnerRole(server);
+		if (foundRole !== undefined) {
+			role = foundRole;
+		} else {
+			try {
+				role = await server.createRole({
+					name : roleNames.SERVER_OWNER,
+					color : 'GREY',
+					mentionable : false
+				}, 'Wiktor Bot per-server permission system role setup.');
+			} catch(e) {
+				// error
+				console.error();
+			}
+		}
+		if (role !== undefined) {
+			serverEntry.roles.owner = role.id;
 			common.log('Added server owner role to \'' + server.name + '\'.');
-		} catch(e) {
-			// error
-			console.error();
 		}
 	}
 	if (!serverEntry.roles.hasOwnProperty('superuser')) {
-		try {
-			let createdRole = await server.createRole({
-				name : 'Wiktor Server Super User',
-				color : 'GREY',
-				mentionable : false
-			}, 'Wiktor Bot per-server permission system role setup.');
-			serverEntry.roles.superuser = createdRole.id;
+		let role;
+		let foundRole = findServerSuperUserRole(server);
+		if (foundRole !== undefined) {
+				role = foundRole;
+		} else {
+			try {
+				role = await server.createRole({
+					name : roleNames.SERVER_SUPERUSER,
+					color : 'GREY',
+					mentionable : false
+				}, 'Wiktor Bot per-server permission system role setup.');
+			} catch (e) {
+				// error
+				console.error(e);
+			}
+		}
+		if (role !== undefined) {
+			serverEntry.roles.superuser = role.id;
 			common.log('Added server superuser role to \'' + server.name + '\'.');
-		} catch(e) {
-			// error
-			console.error(e);
 		}
 	}
 	if (!serverEntry.hasOwnProperty('disabledFeatures')) {
