@@ -228,7 +228,6 @@ module.exports = {
 	updatePresence, parseDate,
 	sendWednesday,
 	combineCommandChain, getCommandHelp, getFullHelpEmbed,
-	getCommandHelp2,
 	waterTimers, runningWaterTimers,
 	loadWaterTimers, addWaterTimer, startAllWaterTimers,
 	reminders, runningReminders, getRemindersOfUser,
@@ -674,74 +673,30 @@ function combineCommandChain(commandChain) {
 
 /**
  * Helper method for getting command help.
- * @param {String} commandString
+ * @param {Command} command
  * @param {String} usage
  * @param {String} description
  * @returns {string}
  */
-function getHelpRow(commandString, usage, description = undefined) {
-	let base = '`' + Config.prefix + commandString + ' ' + usage + '`' + '\n';
-	return description === undefined ? base : base + '> ' + description + '\n';
-}
-
-function getHelpRow2(command, usage, description = '') {
+function getHelpRow(command, usage, description = '') {
 	let base = '`' + Config.prefix + combineCommandChain(command.getCommandChain()) + ' ' + usage + '`' + '\n';
 	return description === '' ? base : base + '> ' + description + '\n';
 }
 
-function getCommandHelp2(command) {
-	let helpText = '';
-	for (let docEntry of command.doc) {
-		helpText+= getHelpRow2(command, docEntry.usage, docEntry.description);
-	}
-	if (command.sub.size > 1) {
-		command.sub.forEach(subCommand => {
-			helpText += getCommandHelp2(subCommand);
-		});
-	}
-	return helpText;
-}
-
 /**
  * Returns a list of possible uses of a command as a string
- * @param {Object} command
- * @param {Array} commandChain
- * @returns {String}
+ * @param command
+ * @returns {string}
  */
-function getCommandHelp(command, commandChain = []) {
-	let localCommandChain = commandChain.slice();
-	localCommandChain.push(command);
-	let commandString = combineCommandChain(localCommandChain);
+function getCommandHelp(command) {
 	let helpText = '';
-	if (command.hasOwnProperty('usage')) {
-		if (command.hasOwnProperty('description')) {
-			if (typeof command.usage === 'string' && typeof command.description === 'string') {
-				helpText += getHelpRow(commandString, command.usage, command.description);
-			} else if (command.usage instanceof Array && command.description instanceof Array) {
-				if (command.usage.length === command.description.length) {
-					for (let i = 0; i < command.usage.length; i++) {
-						helpText += getHelpRow(commandString, command.usage[i], command.description[i]);
-					}
-				} else warn(`Lengths of usage and description properties of command '${commandString}' do not match.`);
-			} else warn(`Types of usage and description properties of command '${commandString}' do not match.`);
-		} else {
-			if (typeof command.usage === 'string') {
-				helpText += getHelpRow(commandString, command.usage);
-			} else if (command.usage instanceof Array) {
-				for (let i = 0; i < command.usage.length; i++) {
-					helpText += getHelpRow(commandString, command.usage[i]);
-				}
-			}
-			info(`Command '${commandString}' has usage property, but no description property.`)
-		}
-	} else if ([argumentValues.OPTIONAL, argumentValues.REQUIRED].includes(command.args)) info(`Command '${commandString}' doesn't have a usage property.`);
-
-	if (command.hasOwnProperty('sub')) {
-		let subs = command.sub;
-		for (let sub in subs) {
-			if (!subs.hasOwnProperty(sub)) continue;
-			helpText += getCommandHelp(subs[sub], localCommandChain);
-		}
+	for (let docEntry of command.doc) {
+		helpText+= getHelpRow(command, docEntry.usage, docEntry.description);
+	}
+	if (command.sub.size > 0) {
+		command.sub.forEach(subCommand => {
+			helpText += getCommandHelp(subCommand);
+		});
 	}
 	return helpText;
 }
@@ -753,12 +708,8 @@ function getCommandHelp(command, commandChain = []) {
  */
 function getFullHelpEmbed(msg, embed) {
 	const { commands } = msg.client;
-	commands.forEach(function (command, name) {
-		if (command instanceof Command) {
-			embed.addField(command.name, getCommandHelp2(command))
-		} else {
-			embed.addField(name, getCommandHelp(command));
-		}
+	commands.forEach(command => {
+		embed.addField(command.name, getCommandHelp(command))
 	});
 }
 

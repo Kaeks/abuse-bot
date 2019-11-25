@@ -438,11 +438,7 @@ function findSubCommand(msg, suffix, command) {
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.GREEN)
 			.setTitle('Help for ' + commandString);
-		if (command instanceof Command) {
-			embed.setDescription(common.getCommandHelp2(command))
-		} else {
-			embed.setDescription(common.getCommandHelp(command, commandChain));
-		}
+			embed.setDescription(common.getCommandHelp(command));
 		msg.channel.send({ embed: embed });
 	}
 	return false;
