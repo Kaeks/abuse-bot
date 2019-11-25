@@ -216,6 +216,7 @@ const reactionEvents = require('./enum/ReactionEventEnum');
 const gameTypes = require('./enum/GameTypeEnum');
 const permissionLevels = require('./enum/PermissionLevelEnum');
 const serverFeatures = require('./enum/ServerFeatureEnum');
+const timeSpans = require('./enum/TimeSpanEnum');
 
 //// EXPORTS
 module.exports = {
@@ -563,6 +564,7 @@ function updatePresence(status = 'online', name = Config.prefix + 'help', type =
 function parseDate(date) {
 	let now = new Date();
 	let diff = date - now;
+	let absDiff = Math.abs(diff);
 
 	let year = date.getFullYear(),
 		month = date.getMonth(),
@@ -570,22 +572,22 @@ function parseDate(date) {
 		dayOfWeek = date.getDay(),
 		hours = date.getHours(),
 		minutes = date.getMinutes(),
-		//seconds = date.getSeconds(),
 		monthString = months[month].short,
 		dowString = daysOfWeek[dayOfWeek].name;
 
 	// Less than a day
-	if (diff <= 24 * 60 * 60 * 1000) {
-		let diffHours = Math.floor(diff / (1000 * 60 * 60));
-		let diffMinutes = Math.floor(diff / (1000 * 60) - 60 * diffHours);
-		// Less than an hour
-		if (diff <= 60 * 60 * 1000) {
-			let diffSecs = Math.floor(diff / 1000 - 60 * diffMinutes);
-			// Less than a minute
-			if (diff <= 60 * 1000) return `In ${diffSecs} second${diffSecs !== 1 ? 's' : ''}`;
-			return `In ${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ${diffSecs > 0 ? diffSecs + ' second' + (diffSecs !== 1 ? 's' : '') : ''}`
-		}
-		return `In ${diffHours} hour${diffHours !== 1 ? 's' : ''} ${diffMinutes > 0 ? diffMinutes + ' minute' + (diffMinutes !== 1 ? 's' : '') : ''}`
+	if (absDiff <= timeSpans.DAY) {
+		let diffHours = Math.floor(absDiff / timeSpans.HOUR);
+		let diffHoursString = diffHours + ' hour' + (diffHours !== 1 ? 's' : '');
+		let diffMinutes = Math.floor(absDiff / timeSpans.MINUTE - 60 * diffHours);
+		let diffMinutesString = diffMinutes + ' minute' + (diffMinutes !== 1 ? 's' : '');
+		let diffSecs = Math.floor(absDiff / timeSpans.SECOND - 60 * diffMinutes);
+		let diffSecsString = diffSecs + ' second' + (diffSecs !== 1 ? 's' : '');
+		return (diff > 0 ? 'In ' : '')
+			+ (absDiff > timeSpans.HOUR ? diffHoursString + ' ' : '')
+			+ (absDiff > timeSpans.MINUTE ? diffMinutesString + ' ' : '')
+			+ (absDiff <= timeSpans.MINUTE ? diffSecsString : '')
+			+ (diff < 0 ? ' ago' : '');
 	}
 
 	// Not this year
