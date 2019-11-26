@@ -14,6 +14,7 @@ const argumentValues = require('../enum/ArgumentValueEnum');
 const colors = require('../enum/EmbedColorEnum');
 const permissionLevels = require('../enum/PermissionLevelEnum');
 const timeSpans = require('../enum/TimeSpanEnum');
+const confirmationEmojis = require('../enum/ConfirmationEmojiEnum');
 
 let commandReminderAdd = new SubCommand('add', argumentValues.REQUIRED)
 	.addDoc(
@@ -100,7 +101,7 @@ let commandReminderRemoveAll = new SubCommand('all', argumentValues.NONE)
 		msg.channel.send({ embed: confirmationEmbed }).then(message => {
 			message.react('👌');
 			message.awaitReactions((reaction, reactor) => {
-				return ['👌', '🆗', '👍', '☑', '✅', '✔'].includes(reaction.emoji.name) && reactor === user
+				return Object.values(confirmationEmojis).includes(reaction.emoji.name) && reactor === user
 			}, {
 				time : CONFIRMATION_TIMEOUT * timeSpans.SECOND,
 				max : 1,
@@ -133,6 +134,7 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 	.addDoc('<#>', 'Remove the reminder with list #<#>.')
 	.addSub(commandReminderRemoveAll)
 	.setExecute((msg, suffix) => {
+		let user = msg.author;
 		let embed = new Discord.RichEmbed();
 		if (isNaN(suffix)) {
 			embed.setColor(colors.RED)
@@ -149,8 +151,7 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 			return false;
 		}
 		let reminderIndex = parseInt(suffix, 10);
-		let simpleReminders = common.getRemindersOfUser(msg.author).simplify();
-		common.debug(simpleReminders);
+		let simpleReminders = common.getRemindersOfUser(user).simplify();
 		let reminder;
 		if (!simpleReminders.has(reminderIndex)) {
 			embed.setColor(colors.RED)
@@ -160,18 +161,53 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 			return false;
 		}
 		reminder = simpleReminders.get(reminderIndex);
-		if (!reminder.removeUser(msg.author)) {
-			embed.setColor(colors.RED)
-				.setTitle('Oops!')
-				.setDescription('Something went wrong when trying to remove that reminder from your list.');
-			msg.channel.send({embed : embed});
-			return false;
-		}
-		let msgLink = reminder.userMsg.getLink();
-		embed.setColor(colors.GREEN)
-			.setTitle('Left reminder!')
-			.setDescription(msg.author + ' you will no longer be reminded about [this message](<' + msgLink + '>) ' + (reminder.task.length > 0 ? '\nwith the task\n> ' + reminder.task + '\n' : '') + 'on ' + reminder.date + '.');
-		msg.channel.send({embed : embed});
+
+		// Timeout for confirmation reaction in seconds
+		const CONFIRMATION_TIMEOUT = 30;
+
+		let reminderString = '#' + reminderIndex + (reminder.task.length > 0 ? ' (' + reminder.task + ')' : '') + ' set for ' + reminder.date;
+
+		let confirmationEmbed = new Discord.RichEmbed()
+			.setColor(colors.PURPLE)
+			.setTitle('Are you sure?')
+			.setDescription('You are about to leave reminder ' + reminderString + '. Is that 👌?')
+			.setFooter('React with 👌 to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
+		msg.channel.send({ embed: confirmationEmbed }).then(message => {
+			message.react('👌');
+			message.awaitReactions((reaction, reactor) => {
+				return Object.values(confirmationEmojis).includes(reaction.emoji.name) && reactor === user
+			}, {
+				time : CONFIRMATION_TIMEOUT * timeSpans.SECOND,
+				max : 1,
+				errors : ['time']
+			}).then(collected => {
+				if (!reminder.removeUser(user)) {
+					embed.setColor(colors.RED)
+						.setTitle('Oops!')
+						.setDescription('Something went wrong when trying to remove that reminder from your list.');
+					msg.channel.send({embed : embed});
+					return false;
+				}
+				let theEmoji = collected.first().emoji.name;
+				let friendlyDescription = '👌 Removed you from reminder ' + reminderString + '.';
+				let rudeDescription = 'Listen up, kid. You were supposed to react with 👌 and not '
+					+ theEmoji + '.' + '\n'
+					+ 'I\'ll let that slip this time and removed you from reminder ' + reminderString + '.';
+				let successEmbed = new Discord.RichEmbed()
+					.setColor(colors.GREEN)
+					.setTitle('Removed from reminder!')
+					.setDescription(theEmoji === '👌' ? friendlyDescription : rudeDescription);
+				message.edit({ embed: successEmbed });
+			}).catch(collected => {
+				let abortedEmbed = new Discord.RichEmbed()
+					.setColor(colors.RED)
+					.setTitle('Confirmation timed out!')
+					.setDescription('You did not confirm your action. Process aborted.');
+				message.edit({ embed: abortedEmbed }).then(editedMessage => {
+					editedMessage.delete(5000);
+				});
+			});
+		});
 	});
 
 
