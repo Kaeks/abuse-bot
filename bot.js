@@ -86,7 +86,7 @@ client.on('message', msg => {
 				setTimeout(function() {
 					msg.delete().catch(console.error);
 				}, 3000);
-			}		
+			}
 		}
 	} else {
 		// Message is not a command
@@ -303,7 +303,7 @@ async function setUpServer(server) {
 	if (!serverEntry.roles.hasOwnProperty('owner')) {
 		let role;
 		let foundRole = findServerOwnerRole(server);
-		if (foundRole !== undefined) {
+		if (foundRole !== undefined && foundRole != null) {
 			role = foundRole;
 		} else {
 			try {
@@ -325,7 +325,7 @@ async function setUpServer(server) {
 	if (!serverEntry.roles.hasOwnProperty('superuser')) {
 		let role;
 		let foundRole = findServerSuperUserRole(server);
-		if (foundRole !== undefined) {
+		if (foundRole !== undefined && foundRole != null) {
 				role = foundRole;
 		} else {
 			try {
