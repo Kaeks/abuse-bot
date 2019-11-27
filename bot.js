@@ -218,9 +218,9 @@ client.on('messageReactionRemove', ((messageReaction, user) => {
 }));
 
 // ADDED TO SERVER
-client.on('guildCreate', guild => {
+client.on('guildCreate', async guild => {
 	common.log('Joined server \'' + guild.name + '\'.');
-	setUpServer(guild);
+	await setUpServer(guild);
 });
 
 // REMOVED FROM SERVER

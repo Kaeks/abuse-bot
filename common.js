@@ -367,6 +367,11 @@ async function readReminders() {
 	for (let reminderEntry of Reminders) {
 		let jsonReminder = reminderEntry[1];
 
+		// Convert old entries to use larger, but easier to use shorthand message format instead of just the ID
+		if (typeof jsonReminder.userMsg == 'string') {
+			jsonReminder.userMsg = await getFixedMessage(jsonReminder.userMsg);
+		}
+
 		let userMsg = await getReminderMsg(jsonReminder.userMsg);
 
 		let botMsg;
@@ -374,6 +379,10 @@ async function readReminders() {
 		if (jsonReminder.botMsg == null) {
 			botMsg = null;
 		} else {
+			// Convert old entries to use larger, but easier to use shorthand message format instead of just the ID
+			if (typeof jsonReminder.botMsg == 'string') {
+				jsonReminder.botMsg = await getFixedMessage(jsonReminder.botMsg);
+			}
 			botMsg = await getReminderMsg(jsonReminder.botMsg);
 		}
 
@@ -518,6 +527,31 @@ function saveEdited() 		{saveFile(EDITED_PATH, 	Edited);	}
 function saveReminders()	{saveFile(REMINDER_PATH, Array.from(formatReminders()));}
 
 // HELPERS
+
+/**
+ * Gets the fixed shorthand message entry for a messageId
+ * This is used to convert an entry that is just a messageId into a usable entry
+ * @param msgId
+ * @returns {Promise<{channel: {id: *, type: *}, id: *}>}
+ */
+async function getFixedMessage(msgId) {
+	let message = await findMessageWithId(msgId);
+
+	let fixedMessage = {
+		id : message.id,
+		channel : {
+			id : message.channel.id,
+			type : message.channel.type
+		}
+	};
+	if (message.channel.type === 'dm') {
+		fixedMessage.channel.recipient = {
+			id : message.channel.recipient.id
+		};
+	}
+	debug('Got fixed message entry for message with id \'' + msgId + '\'.');
+	return fixedMessage
+}
 
 /**
  * Returns the user instance of the owner of the bot, as specified inside `config.json`
@@ -827,7 +861,7 @@ function getRemindersOfUser(user, collection = reminders) {
 	});
 }
 
-async function findChannelOfMsgId(id) {
+async function findMessageWithId(msgId) {
 	let textChannels = client.channels.filter(channel => { return channel.type === 'text'; });
 	let groupChannels = client.channels.filter(channel => { return channel.type === 'group'; });
 	let users = getUsers();
@@ -841,8 +875,7 @@ async function findChannelOfMsgId(id) {
 	for (const channelEntry of channels) {
 		let channel = channelEntry[1];
 		try {
-			let message = await channel.fetchMessage(id);
-			return message.channel;
+			return await channel.fetchMessage(msgId);
 		} catch (e) {
 			debug('This ain\'t it, chief.');
 		}
