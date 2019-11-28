@@ -3,9 +3,8 @@ const { Discord, chrono, Config } = common;
 
 const Command = require('../class/Command');
 
-const argumentValues = require('../enum/ArgumentValueEnum');
-const permissionLevels = require('../enum/PermissionLevelEnum');
-const colors = require('../enum/EmbedColorEnum');
+// IMPORT ALL ENUMS
+const enums = require('../enum');
 
 let commandEval = new Command('eval', argumentValues.REQUIRED, permissionLevels.BOT_OWNER)
     .addDoc(
