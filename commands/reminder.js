@@ -16,6 +16,8 @@ const permissionLevels = require('../enum/PermissionLevelEnum');
 const timeSpans = require('../enum/TimeSpanEnum');
 const confirmationEmojis = require('../enum/ConfirmationEmojiEnum');
 
+const PREF_CONFIRMATION_EMOJI_BASE = '👌';
+
 let commandReminderAdd = new SubCommand('add', argumentValues.REQUIRED)
 	.addDoc(
 		'<time/date> [-m <message]',
@@ -96,10 +98,10 @@ let commandReminderRemoveAll = new SubCommand('all', argumentValues.NONE)
 		let confirmationEmbed = new Discord.RichEmbed()
 			.setColor(colors.PURPLE)
 			.setTitle('Are you sure?')
-			.setDescription('You are about to leave all of your (' + userReminders.size + ') reminders. Is that 👌?')
-			.setFooter('React with 👌 to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
+			.setDescription('You are about to leave all of your (' + userReminders.size + ') reminders. Is that ' + PREF_CONFIRMATION_EMOJI_BASE + '?')
+			.setFooter('React with ' + PREF_CONFIRMATION_EMOJI_BASE + ' to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
 		msg.channel.send({ embed: confirmationEmbed }).then(message => {
-			message.react('👌');
+			message.react(PREF_CONFIRMATION_EMOJI_BASE);
 			message.awaitReactions((reaction, reactor) => {
 				return Object.values(confirmationEmojis).includes(reaction.emoji.name) && reactor === user
 			}, {
@@ -108,16 +110,17 @@ let commandReminderRemoveAll = new SubCommand('all', argumentValues.NONE)
 				errors : ['time']
 			}).then(collected => {
 				common.leaveAllReminders(user);
-				let theEmoji = collected.first().emoji.name;
-				let friendlyDescription = '👌 Removed you from all of your reminders.';
-				let rudeDescription = 'Listen up, kid. You were supposed to react with 👌 and not '
-					+ theEmoji + '. I\'ll let that slip this time and removed you from all of your reminders.';
+				let reactionEmojiName = collected.first().emoji.name;
+				let reactionEmojiBase = reactionEmojiName.substring(0,2);
+				let friendlyDescription = PREF_CONFIRMATION_EMOJI_BASE + ' Removed you from all of your reminders.';
+				let rudeDescription = 'Listen up, kid. You were supposed to react with ' + PREF_CONFIRMATION_EMOJI_BASE + ' and not '
+					+ reactionEmojiName + '. I\'ll let that slip this time and removed you from all of your reminders.';
 				let successEmbed = new Discord.RichEmbed()
 					.setColor(colors.GREEN)
 					.setTitle('Removed from all reminders!')
-					.setDescription(theEmoji === '👌' ? friendlyDescription : rudeDescription);
+					.setDescription(reactionEmojiBase === PREF_CONFIRMATION_EMOJI_BASE ? friendlyDescription : rudeDescription);
 				message.edit({ embed: successEmbed });
-			}).catch(collected => {
+			}).catch(() => {
 				let abortedEmbed = new Discord.RichEmbed()
 					.setColor(colors.RED)
 					.setTitle('Confirmation timed out!')
@@ -170,10 +173,10 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 		let confirmationEmbed = new Discord.RichEmbed()
 			.setColor(colors.PURPLE)
 			.setTitle('Are you sure?')
-			.setDescription('You are about to leave reminder ' + reminderString + '. Is that 👌?')
-			.setFooter('React with 👌 to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
+			.setDescription('You are about to leave reminder ' + reminderString + '. Is that ' + PREF_CONFIRMATION_EMOJI_BASE + '?')
+			.setFooter('React with ' + PREF_CONFIRMATION_EMOJI_BASE + ' to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
 		msg.channel.send({ embed: confirmationEmbed }).then(message => {
-			message.react('👌');
+			message.react(PREF_CONFIRMATION_EMOJI_BASE);
 			message.awaitReactions((reaction, reactor) => {
 				return Object.values(confirmationEmojis).includes(reaction.emoji.name) && reactor === user
 			}, {
@@ -188,17 +191,18 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 					msg.channel.send({embed : embed});
 					return false;
 				}
-				let theEmoji = collected.first().emoji.name;
-				let friendlyDescription = '👌 Removed you from reminder ' + reminderString + '.';
-				let rudeDescription = 'Listen up, kid. You were supposed to react with 👌 and not '
-					+ theEmoji + '.' + '\n'
+				let reactionEmojiName = collected.first().emoji.name;
+				let reactionEmojiBase = reactionEmojiName.substring(0,2);
+				let friendlyDescription = PREF_CONFIRMATION_EMOJI_BASE + ' Removed you from reminder ' + reminderString + '.';
+				let rudeDescription = 'Listen up, kid. You were supposed to react with ' + PREF_CONFIRMATION_EMOJI_BASE + ' and not '
+					+ reactionEmojiName + '.' + '\n'
 					+ 'I\'ll let that slip this time and removed you from reminder ' + reminderString + '.';
 				let successEmbed = new Discord.RichEmbed()
 					.setColor(colors.GREEN)
 					.setTitle('Removed from reminder!')
-					.setDescription(theEmoji === '👌' ? friendlyDescription : rudeDescription);
+					.setDescription(reactionEmojiBase === PREF_CONFIRMATION_EMOJI_BASE ? friendlyDescription : rudeDescription);
 				message.edit({ embed: successEmbed });
-			}).catch(collected => {
+			}).catch(() => {
 				let abortedEmbed = new Discord.RichEmbed()
 					.setColor(colors.RED)
 					.setTitle('Confirmation timed out!')
