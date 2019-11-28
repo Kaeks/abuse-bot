@@ -138,6 +138,22 @@ Discord.Collection.prototype.simplify = function () {
 	return simple;
 };
 
+/**
+ * Returns a page of this collection limited by an amount
+ * @param {Number} limit
+ * @param {Number} page
+ * @returns {Discord.Collection<*, *>}
+ */
+Discord.Collection.prototype.getSubList = function (limit, page = 0) {
+	let subList = new Discord.Collection();
+	for (let i = page * limit; i < limit * (page + 1); i++) {
+		let cur = this.array()[i];
+		if (cur === undefined) break;
+		subList.set(i, cur);
+	}
+	return subList;
+};
+
 // CONSTANTS
 const CONFIG_PATH 	= './config.json';
 const DATA_PATH 	= './storage/data.json';

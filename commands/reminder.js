@@ -220,13 +220,14 @@ let commandReminderList = new SubCommand('list', argumentValues.NONE)
 	.setExecute(async msg => {
 		let user = msg.author;
 		let reminderList = new UserReminderList(msg, user);
-		await reminderList.send(msg.channel);
+		await reminderList.build(msg.channel);
 	});
 
 let commandReminderDisplayAll = new SubCommand('all', argumentValues.NONE)
 	.addDoc('', 'Display all reminders of all users.')
-	.setExecute((msg, suffix) => {
-
+	.setExecute(async msg => {
+		let reminderList = new ReminderList(msg, common.reminders);
+		await reminderList.build(await msg.author.getDmChannel());
 	});
 
 let commandReminderDisplay = new SubCommand('display', argumentValues.REQUIRED, permissionLevels.BOT_SUPERUSER)

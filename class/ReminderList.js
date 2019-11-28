@@ -3,41 +3,10 @@ const { Discord } = common;
 
 const reactionEvents = require('../enum/ReactionEventEnum');
 const colors = require('../enum/EmbedColorEnum');
-
-const emojiPrev = '◀';
-const emojiNext = '▶';
-
-const emojiNums = {
-	0 : '0️⃣',
-	1 : '1️⃣',
-	2 : '2️⃣',
-	3 : '3️⃣',
-	4 : '4️⃣',
-	5 : '5️⃣',
-	6 : '6️⃣',
-	7 : '7️⃣',
-	8 : '8️⃣',
-	9 : '9️⃣',
-	10: '🔟'
-};
-
-const ITEM_LIMIT = 5;
-const ABSOLUTE_MAX_ITEM_LIMIT = Object.values(emojiNums).length;
-
-if (ITEM_LIMIT > ABSOLUTE_MAX_ITEM_LIMIT) process.exit(1);
+const emojiNums = require('../enum/EmojiNumEnum')
 
 // ms
 const LISTENING_TIME = 30 * 60 * 1000;
-
-function getSubList(collection, page = 0) {
-	let subList = new Discord.Collection();
-	for (let i = page * ITEM_LIMIT; i < ITEM_LIMIT * (page + 1); i++) {
-		let cur = collection.array()[i];
-		if (cur === undefined) break;
-		subList.set(i, cur);
-	}
-	return subList;
-}
 
 class ReminderList {
 	id;
@@ -49,11 +18,15 @@ class ReminderList {
 	expireDate;
 	timer;
 
+	ITEM_LIMIT = 5;
+	EMOJI_PREV = '◀';
+	EMOJI_NEXT = '▶';
+
 	constructor(userMsg, collection) {
 		this.id = Discord.SnowflakeUtil.generate();
 		this.reminders = collection;
 		this.userMsg = userMsg;
-		this.pages = Math.ceil(collection.size / ITEM_LIMIT);
+		this.pages = Math.ceil(collection.size / this.ITEM_LIMIT);
 	}
 
 	startExpireTimer() {
@@ -84,7 +57,7 @@ class ReminderList {
 
 	getReminderOfCurList(num) {
 		let iterator = 0;
-		for (let reminderEntry of getSubList(this.reminders, this.curPage)) {
+		for (let reminderEntry of this.reminders.getSubList(this.ITEM_LIMIT, this.curPage)) {
 			if (iterator === num) {
 				return reminderEntry[1];
 			}
@@ -115,20 +88,65 @@ class ReminderList {
 		this.changePage(this.curPage - 1);
 	}
 
-	send(channel) {
+	getPageText() {
+		return this.pages > 1 ? 'Page ' + (this.curPage + 1) + ' of ' + this.pages : '';
+	}
+
+	getFooterText(channel) {
+		let footerText = '';
+		if (channel.type !== 'dm') footerText += 'React with a number to join that reminder!';
+		if (this.pages > 1) footerText += ' Use ' + this.EMOJI_PREV + ' and ' + this.EMOJI_NEXT + ' to shuffle through the list.';
+		return footerText;
+	}
+
+	getEmbed(channel) {
+		// Throw error when we are on a page that doesn't exist with the amount of reminders the user has
+		// e.g. page 1000 does not exist with only 10 reminders
+		if (this.reminders.size < this.curPage * this.ITEM_LIMIT + 1) {
+			throw 'Size of the collection of reminders is too small for the given page count (' + this.curPage + ').';
+		}
+
+		let embed = new Discord.RichEmbed()
+			.setColor(colors.GREEN)
+			.setTitle('Reminders!')
+			.setFooter(this.getFooterText(channel));
+
+		// Return special message for empty collection
+		if (this.reminders.size === 0) {
+			embed.setDescription('There are no reminders for that collection.');
+			return embed;
+		}
+
+		let tempText = '';
+
+		let subList = this.reminders.simplify().getSubList(this.ITEM_LIMIT, this.curPage);
+		let listIterator = 0;
+		subList.forEach((reminder, index) => {
+			if (channel.type !== 'dm') tempText += '(' + emojiNums[listIterator] + ')';
+			tempText += reminder.getSingleLine(index);
+			listIterator++;
+			if (index !== subList.lastKey) tempText += '\n';
+		});
+
+		embed.setDescription(tempText);
+
+		return embed;
+	}
+
+	build(channel) {
 		let reminders = this.reminders;
-		let hasNext = ITEM_LIMIT < reminders.size;
+		let hasNext = this.ITEM_LIMIT < reminders.size;
 		let embed = this.getEmbed(channel);
 
 		channel.send({embed : embed}).then(async message => {
 			this.msg = message;
 			this.startExpireTimer();
 			if (hasNext) {
-				await message.react(emojiPrev);
-				await message.react(emojiNext);
+				await message.react(this.EMOJI_NEXT);
+				await message.react(this.EMOJI_PREV);
 			}
 			if (channel.type !== 'dm') {
-				let max = hasNext ? ITEM_LIMIT : reminders.size;
+				let max = hasNext ? this.ITEM_LIMIT : reminders.size;
 				for (let i = 0; i < max; i++) {
 					let curEmoji = emojiNums[i];
 					await message.react(curEmoji);
@@ -137,12 +155,12 @@ class ReminderList {
 
 			common.addReactionListener(message, messageReaction => {
 				this.resetExpireTimer();
-				if (messageReaction.emoji.name === emojiPrev) {
+				if (messageReaction.emoji.name === this.EMOJI_PREV) {
 					this.goPrevPage();
-				} else if (messageReaction.emoji.name === emojiNext) {
+				} else if (messageReaction.emoji.name === this.EMOJI_NEXT) {
 					this.goNextPage();
 				}
-			}, [ emojiPrev, emojiNext ]);
+			}, [ this.EMOJI_PREV, this.EMOJI_NEXT ]);
 
 			common.addReactionListener(message, (messageReaction, user, event) => {
 				this.resetExpireTimer();
@@ -155,56 +173,6 @@ class ReminderList {
 				}
 			}, Object.values(emojiNums));
 		});
-	}
-
-	getEmbed(channel) {
-		let user = this.userMsg.author;
-
-		let embed = new Discord.RichEmbed()
-			.setColor(colors.GREEN)
-			.setTitle('Reminders!')
-			.setAuthor(user.username, user.avatarURL);
-
-		// Filter out people with 0 reminders
-		if (this.reminders.size === 0) {
-			embed.setDescription('You don\'t have any reminders.');
-			return embed;
-		}
-
-		// Throw error when we are on a page that doesn't exist with the amount of reminders the user has
-		// e.g. page 2 does not exist with only 10 reminders
-		if (this.reminders.size < this.curPage * ITEM_LIMIT + 1) {
-			throw 'Size of the collection of reminders is too small for the given page count (' + this.curPage + ').';
-		}
-
-		let tempText = '';
-
-		let subList = getSubList(this.reminders.simplify(), this.curPage);
-		let listIterator = 0;
-		subList.forEach((reminder, index) => {
-			if (this.userMsg.channel !== 'dm') tempText += '(' + emojiNums[listIterator] + ')';
-			tempText += reminder.getSingleLine(index);
-			listIterator++;
-			if (index !== subList.lastKey) tempText += '\n';
-		});
-
-		embed.setDescription(tempText);
-
-		if (channel.type !== 'dm') {
-			let userHandle = user.getHandle();
-			let userString = channel.type === 'text' ?
-				(this.userMsg.member.nickname || user.username) + ' (' + userHandle + ')' :
-				channel.type === 'group' ? userHandle : '';
-
-			let footerText = '';
-			if (this.pages > 1) footerText += 'Page ' + (this.curPage + 1) + ' of ' + this.pages + '\n';
-			footerText += 'If the reminder was issued in a DM the link won\'t work for others except for ' + userString + '.\n';
-			if (channel.type !== 'dm') footerText += 'React with a number to join that reminder!';
-			if (this.pages > 1) footerText += ' Use ' + emojiPrev + ' and ' + emojiNext + ' to shuffle through the list.';
-			embed.setFooter(footerText);
-		}
-
-		return embed;
 	}
 
 }
