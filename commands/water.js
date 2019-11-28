@@ -63,7 +63,7 @@ let commandWaterJoin = new SubCommand('join', argumentValues.NONE)
 		common.addWaterTimer(waterTimer);
 	});
 
-let commandWaterLeave = new SubCommand('leave', argumentValues.NULL)
+let commandWaterLeave = new SubCommand('leave', argumentValues.NONE)
 	.addDoc('', 'Leave the water club')
 	.setExecute(msg => {
 		let user = msg.author;
