@@ -6,7 +6,7 @@ const Command = require('../class/Command');
 // IMPORT ALL ENUMS
 const enums = require('../enum');
 
-let commandEval = new Command('eval', argumentValues.REQUIRED, permissionLevels.BOT_OWNER)
+let commandEval = new Command('eval', enums.argumentValues.REQUIRED, enums.permissionLevels.BOT_OWNER)
     .addDoc(
         '<javascript>',
         'Runs javascript code. Only available to the owner of the bot.' + '\n' +

@@ -104,7 +104,9 @@ class WaterTimer {
 		let now = new Date();
 		let timer = setTimeout(function() {
 			me.trigger();
-			let subsequentInterval = setInterval(me.trigger, me.interval * MINUTE_MULTIPLIER);
+			let subsequentInterval = setInterval(() => {
+				me.trigger()
+			}, me.interval * MINUTE_MULTIPLIER);
 			common.runningWaterTimers.set(me.user.id, subsequentInterval)
 		}, this.nextDate - now);
 
