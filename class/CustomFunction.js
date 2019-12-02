@@ -1,3 +1,4 @@
+const common = require('../common');
 const enums = require('../enum');
 
 class CustomFunction {
@@ -15,8 +16,15 @@ class CustomFunction {
 		this.executions = executions
 	}
 
-	execute(msg) {
+	delete() {
+		if (!common.customFunctions.delete(this.name)) throw 'Custom function with name \'' + this.name + '\' could not be removed from collection.';
+		common.saveCustomFunctions();
+		return true;
+	}
+
+	async execute(msg) {
 		this.executions++;
+		common.saveCustomFunctions();
 		return eval(this.fn);
 	}
 }

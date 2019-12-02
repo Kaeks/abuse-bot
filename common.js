@@ -245,7 +245,7 @@ module.exports = {
 	client,
 	Config, Storage, Blocked, Deleted, Edited,
 	saveFile,
-	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited, saveReminders, saveWaterTimers,
+	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited, saveReminders, saveWaterTimers, saveCustomFunctions,
 	debug, log, info, warn,
 	updatePresence, parseDate,
 	sendWednesday,
@@ -256,7 +256,7 @@ module.exports = {
 	loadReminders, addReminder, startAllReminders, filterReminders, leaveAllReminders,
 	getBooleanValue, getUsers, testBooleanValue,
 	reactionListeners, addReactionListener, REMINDER_SIGNUP_EMOJI, PREF_CONFIRMATION_EMOJI_BASE,
-	customFunctions, loadCustomFunctions, addCustomFunction
+	customFunctions, loadCustomFunctions, addCustomFunction, deleteAllCustomFunctions
 };
 
 // CLASS IMPORTS
@@ -1055,5 +1055,14 @@ function addReactionListener(msg, fn, reactions = []) {
 function removeReactionListener(id) {
 	if (!reactionListeners.has(id)) return false;
 	reactionListeners.delete(id);
+	return true;
+}
+
+/**
+ * Deletes all custom functions
+ */
+function deleteAllCustomFunctions() {
+	customFunctions.deleteAll();
+	saveCustomFunctions();
 	return true;
 }
