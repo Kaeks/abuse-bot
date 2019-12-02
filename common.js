@@ -164,6 +164,7 @@ const REMINDER_PATH	= './storage/reminders.json';
 const CUSTOM_FUNC_PATH	= './storage/custom_functions.json';
 
 const REMINDER_SIGNUP_EMOJI = '🙋';
+const PREF_CONFIRMATION_EMOJI_BASE = '👌';
 
 // DATA VARS
 let Config = {};
@@ -254,7 +255,7 @@ module.exports = {
 	reminders, runningReminders, getRemindersOfUser,
 	loadReminders, addReminder, startAllReminders, filterReminders, leaveAllReminders,
 	getBooleanValue, getUsers, testBooleanValue,
-	reactionListeners, addReactionListener, REMINDER_SIGNUP_EMOJI,
+	reactionListeners, addReactionListener, REMINDER_SIGNUP_EMOJI, PREF_CONFIRMATION_EMOJI_BASE,
 	customFunctions, loadCustomFunctions, addCustomFunction
 };
 
