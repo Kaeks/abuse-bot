@@ -138,6 +138,22 @@ Discord.Collection.prototype.simplify = function () {
 	return simple;
 };
 
+/**
+ * Returns a page of this collection limited by an amount
+ * @param {Number} limit
+ * @param {Number} page
+ * @returns {Discord.Collection<*, *>}
+ */
+Discord.Collection.prototype.getSubList = function (limit, page = 0) {
+	let subList = new Discord.Collection();
+	for (let i = page * limit; i < limit * (page + 1); i++) {
+		let cur = this.array()[i];
+		if (cur === undefined) break;
+		subList.set(i, cur);
+	}
+	return subList;
+};
+
 // CONSTANTS
 const CONFIG_PATH 	= './config.json';
 const DATA_PATH 	= './storage/data.json';
@@ -145,8 +161,10 @@ const BLOCKED_PATH 	= './storage/blocked_users.json';
 const DELETED_PATH 	= './storage/deleted_messages.json';
 const EDITED_PATH 	= './storage/edited_messages.json';
 const REMINDER_PATH	= './storage/reminders.json';
+const CUSTOM_FUNC_PATH	= './storage/custom_functions.json';
 
 const REMINDER_SIGNUP_EMOJI = '🙋';
+const PREF_CONFIRMATION_EMOJI_BASE = '👌';
 
 // DATA VARS
 let Config = {};
@@ -155,6 +173,7 @@ let Blocked = [];
 let Deleted = [];
 let Edited = [];
 let Reminders = [];
+let CustomFunctions = [];
 
 // LOAD FILES
 Config =	loadFile(CONFIG_PATH, Config);
@@ -163,6 +182,7 @@ Blocked =	loadFile(BLOCKED_PATH, Blocked);
 Deleted =	loadFile(DELETED_PATH, Deleted);
 Edited =	loadFile(EDITED_PATH, Edited);
 Reminders =	loadFile(REMINDER_PATH, Reminders);
+CustomFunctions =	loadFile(CUSTOM_FUNC_PATH, CustomFunctions);
 
 // SET DEFAULT VALUES
 Config.prefix = Config.prefix || '!';
@@ -181,6 +201,7 @@ saveFile(BLOCKED_PATH, Blocked);
 saveFile(DELETED_PATH, Deleted);
 saveFile(EDITED_PATH, Edited);
 saveFile(REMINDER_PATH, Reminders);
+saveFile(CUSTOM_FUNC_PATH, CustomFunctions);
 
 // CHECK REQUIRED VALUES AND EXIT IF NECESSARY
 let canRunBot = true;
@@ -207,12 +228,12 @@ let runningReminders	= new Discord.Collection();
 
 let reactionListeners	= new Discord.Collection();
 
+let customFunctions		= new Discord.Collection();
+
 // ENUM
 const colors = require('./enum/EmbedColorEnum');
 const months = require('./enum/MonthEnum');
 const daysOfWeek = require('./enum/WeekDayEnum');
-const argumentValues = require('./enum/ArgumentValueEnum');
-const reactionEvents = require('./enum/ReactionEventEnum');
 const gameTypes = require('./enum/GameTypeEnum');
 const permissionLevels = require('./enum/PermissionLevelEnum');
 const serverFeatures = require('./enum/ServerFeatureEnum');
@@ -223,8 +244,8 @@ module.exports = {
 	Discord, fs, chrono,
 	client,
 	Config, Storage, Blocked, Deleted, Edited,
-	loadFile, saveFile,
-	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited, saveReminders, saveWaterTimers,
+	saveFile,
+	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited, saveReminders, saveWaterTimers, saveCustomFunctions,
 	debug, log, info, warn,
 	updatePresence, parseDate,
 	sendWednesday,
@@ -234,7 +255,8 @@ module.exports = {
 	reminders, runningReminders, getRemindersOfUser,
 	loadReminders, addReminder, startAllReminders, filterReminders, leaveAllReminders,
 	getBooleanValue, getUsers, testBooleanValue,
-	reactionListeners, addReactionListener, REMINDER_SIGNUP_EMOJI
+	reactionListeners, addReactionListener, REMINDER_SIGNUP_EMOJI, PREF_CONFIRMATION_EMOJI_BASE,
+	customFunctions, loadCustomFunctions, addCustomFunction, deleteAllCustomFunctions
 };
 
 // CLASS IMPORTS
@@ -318,6 +340,7 @@ function saveFile(filePath, variable) {
 
 const Reminder = require('./class/Reminder');
 const WaterTimer = require('./class/WaterTimer');
+const CustomFunction = require('./class/CustomFunction');
 
 /**
  * Adds a reminder to the list
@@ -341,7 +364,7 @@ async function loadReminders() {
 
 /**
  * Helper method to get a message from a reminder message entry
- * @param msgEntry
+ * @param {Object} msgEntry
  * @returns {Promise<*>}
  */
 async function getReminderMsg(msgEntry) {
@@ -371,11 +394,9 @@ async function readReminders() {
 		if (typeof jsonReminder.userMsg == 'string') {
 			jsonReminder.userMsg = await getFixedMessage(jsonReminder.userMsg);
 		}
-
 		let userMsg = await getReminderMsg(jsonReminder.userMsg);
 
 		let botMsg;
-
 		if (jsonReminder.botMsg == null) {
 			botMsg = null;
 		} else {
@@ -518,6 +539,57 @@ function startAllWaterTimers() {
 	debug('Started all water timers.');
 }
 
+function readCustomFunctions() {
+	debug('Reading custom functions...');
+	let collection = new Discord.Collection();
+	for (let customFunctionEntry of CustomFunctions) {
+		let jsonCustomFunction = customFunctionEntry[1];
+
+		let name = jsonCustomFunction.name;
+		let fn = jsonCustomFunction.fn;
+		let creator = client.users.get(jsonCustomFunction.creator);
+		let date = new Date(jsonCustomFunction.date);
+		let executions = jsonCustomFunction.executions;
+
+		let customFunction = new CustomFunction(name, fn, creator, date, executions);
+		collection.set(name, customFunction);
+	}
+	debug('Done!');
+	return collection;
+}
+
+function loadCustomFunctions() {
+	let collection = readCustomFunctions();
+	collection.forEach(customFunction => addCustomFunction(customFunction));
+	debug('Loaded all custom functions.');
+}
+
+function formatCustomFunctions() {
+	let shortCustomFunctions = new Discord.Collection();
+	customFunctions.forEach(customFunction => {
+		shortCustomFunctions.set(customFunction.name, {
+			name: customFunction.name,
+			fn: customFunction.fn,
+			creator: customFunction.creator.id,
+			date: customFunction.date,
+			executions: customFunction.executions
+		})
+	});
+	return shortCustomFunctions;
+}
+
+function addCustomFunction(customFunction) {
+	customFunctions.set(customFunction.name, customFunction);
+	saveCustomFunctions();
+}
+
+function removeCustomFunction(name) {
+	customFunctions.delete(name);
+	saveCustomFunctions();
+}
+
+
+
 // SPECIFIC SAVES
 function saveConfig()		{saveFile(CONFIG_PATH,	Config);	}
 function saveData() 		{saveFile(DATA_PATH, 	Storage);	}
@@ -525,6 +597,7 @@ function saveBlocked()		{saveFile(BLOCKED_PATH, Blocked);	}
 function saveDeleted() 		{saveFile(DELETED_PATH, Deleted);	}
 function saveEdited() 		{saveFile(EDITED_PATH, 	Edited);	}
 function saveReminders()	{saveFile(REMINDER_PATH, Array.from(formatReminders()));}
+function saveCustomFunctions()	{saveFile(CUSTOM_FUNC_PATH, Array.from(formatCustomFunctions()));}
 
 // HELPERS
 
@@ -982,5 +1055,14 @@ function addReactionListener(msg, fn, reactions = []) {
 function removeReactionListener(id) {
 	if (!reactionListeners.has(id)) return false;
 	reactionListeners.delete(id);
+	return true;
+}
+
+/**
+ * Deletes all custom functions
+ */
+function deleteAllCustomFunctions() {
+	customFunctions.deleteAll();
+	saveCustomFunctions();
 	return true;
 }
