@@ -1,3 +1,5 @@
+const { inspect } = require('util');
+
 const common = require('../common');
 const { Discord, Config } = common;
 
@@ -94,14 +96,14 @@ let commandCustomRemove = new SubCommand('remove', argumentValues.REQUIRED)
 
 let commandCustomExecute = new SubCommand('execute', argumentValues.REQUIRED)
 	.addDoc('name', 'Execute a custom function.')
-	.setExecute((msg, suffix) => {
+	.setExecute(async (msg, suffix) => {
 		if (common.customFunctions.has(suffix)) {
 			try {
-				let result = common.customFunctions.get(suffix).execute(msg);
+				let result = await common.customFunctions.get(suffix).execute(msg);
 				let successEmbed = new Discord.RichEmbed()
 					.setColor(colors.PRESTIGE)
 					.setTitle('Custom function result!')
-					.setDescription(result);
+					.setDescription(inspect(result));
 				msg.channel.send({ embed: successEmbed });
 			} catch (e) {
 				let errorEmbed = new Discord.RichEmbed()
