@@ -11,6 +11,9 @@ const reactionEvents = require('./enum/ReactionEventEnum');
 const permissionLevels = require('./enum/PermissionLevelEnum');
 const roleNames = require('./enum/RoleNameEnum');
 
+// Catch UnhandledPromiseRejection
+process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection', error));
+
 /// EXPORTS
 module.exports = {
 	Discord, chrono, client
