@@ -2,7 +2,7 @@ const common = require('../common');
 const { Discord, client } = common;
 let { reminders } = common;
 
-const reactionEvents = require('../enum/ReactionEventEnum');
+const { reactionEvents, colors } = require('../enum');
 
 class Reminder {
 	id;
@@ -21,66 +21,6 @@ class Reminder {
 		this.task = task;
 
 		common.addReminder(this);
-	}
-
-	/**
-	 * Recursive running function to handle times larger than the 32-bit signed positive integer limit in milliseconds
-	 * @param {Date} started
-	 */
-	runTimer(started = new Date()) {
-		let me = this;
-		let now = new Date();
-		let future = new Date(this.date);
-		let diff = future - now;
-		if (diff < 0) {
-			common.info('Reminder with id ' + this.id + ' has its starting point in the past. Deleting.');
-			this.delete();
-			return false;
-		}
-		let timer;
-		if (diff > 0x7FFFFFFF) {
-			timer = setTimeout(function() {
-				me.runTimer(started);
-			});
-		} else {
-			timer = setTimeout(function() {
-				me.trigger().catch(console.error);
-			}, diff);
-		}
-		common.runningReminders.set(this.id, timer);
-		return true;
-	}
-
-	/**
-	 * Sends the reminder to a user
-	 * @param user
-	 * @returns {Promise<void>}
-	 */
-	async send(user) {
-		let otherUsersAmt = this.users.length - 1;
-		let tempText = 'I\'m here to remind you about [this message](<' + this.userMsg.getLink() + '>).';
-		if (this.task.length > 0) tempText += '\nThe task was:\n> ' + this.task;
-		let embed = new Discord.RichEmbed()
-			.setColor(colors.GREEN)
-			.setTitle('Reminder!')
-			.setDescription(tempText);
-		if (otherUsersAmt > 0) embed.setFooter(otherUsersAmt + ' other ' + (otherUsersAmt === 1 ? 'person' : 'people') + ' also got this reminder!');
-		let channel = await user.getDmChannel();
-		channel.send({ embed: embed });
-	}
-
-	/**
-	 * Triggers the reminder
-	 * @returns {Promise<void>}
-	 */
-	async trigger() {
-		for (let userEntry of this.users) {
-			let user = client.users.get(userEntry);
-			await this.send(user);
-		}
-		common.debug('Triggered reminder with id ' + this.id + '.');
-		this.delete();
-		common.saveReminders();
 	}
 
 	/**
@@ -106,6 +46,65 @@ class Reminder {
 		reminders.delete(this.id);
 		common.saveReminders();
 		common.debug('Deleted reminder with id ' + this.id + '.');
+	}
+
+	/**
+	 * Triggers the reminder
+	 */
+	trigger() {
+		this.users.forEach(user => {
+			this.send(user)
+				.catch(console.error);
+		});
+		common.debug('Triggered reminder with id ' + this.id + '.');
+		this.delete();
+		common.saveReminders();
+	}
+
+	/**
+	 * Recursive running function to handle times larger than the 32-bit signed positive integer limit in milliseconds
+	 * @param {Date} started
+	 */
+	runTimer(started = new Date()) {
+		let me = this;
+		let now = new Date();
+		let future = new Date(this.date);
+		let diff = future - now;
+		if (diff < 0) {
+			common.info('Reminder with id ' + this.id + ' has its starting point in the past. Deleting.');
+			this.delete();
+			return false;
+		}
+		let timer;
+		if (diff > 0x7FFFFFFF) {
+			timer = setTimeout(function() {
+				me.runTimer(started);
+			});
+		} else {
+			timer = setTimeout(function() {
+				me.trigger();
+			}, diff);
+		}
+		common.runningReminders.set(this.id, timer);
+		return true;
+	}
+
+	/**
+	 * Sends the reminder to a user
+	 * @param user
+	 * @returns {Promise<void>}
+	 */
+	async send(user) {
+		let otherUsersAmt = this.users.length - 1;
+		let tempText = 'I\'m here to remind you about [this message](<' + this.userMsg.getLink() + '>).';
+		if (this.task.length > 0) tempText += '\nThe task was:\n> ' + this.task;
+		let embed = new Discord.RichEmbed()
+			.setColor(colors.GREEN)
+			.setTitle('Reminder!')
+			.setDescription(tempText);
+		if (otherUsersAmt > 0) embed.setFooter(otherUsersAmt + ' other ' + (otherUsersAmt === 1 ? 'person' : 'people') + ' also got this reminder!');
+		let channel = await user.getDmChannel();
+		channel.send({ embed: embed });
 	}
 
 	/**

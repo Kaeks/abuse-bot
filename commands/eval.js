@@ -16,7 +16,7 @@ let commandEval = new Command('eval', enums.argumentValues.REQUIRED, enums.permi
             let out = eval(suffix);
             if (out) {
                 let embed = new Discord.RichEmbed()
-                    .setColor(colors.PRESTIGE)
+                    .setColor(enums.colors.PRESTIGE)
                     .setTitle('Eval output')
                     .setDescription('```' + out + '```');
                 msg.channel.send({ embed : embed });

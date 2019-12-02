@@ -64,6 +64,7 @@ let commandReminderAdd = new SubCommand('add', argumentValues.REQUIRED)
 		messagePromise.then(botMsg => {
 			let reminder = new Reminder(msg, date, taskString, botMsg);
 			common.addReminder(reminder);
+			reminder.start();
 		});
 		if (msg.channel.type !== 'dm') {
 			messagePromise.then(message => {
