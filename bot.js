@@ -11,6 +11,9 @@ const reactionEvents = require('./enum/ReactionEventEnum');
 const permissionLevels = require('./enum/PermissionLevelEnum');
 const roleNames = require('./enum/RoleNameEnum');
 
+// Catch UnhandledPromiseRejection
+process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection', error));
+
 /// EXPORTS
 module.exports = {
 	Discord, chrono, client
@@ -25,8 +28,6 @@ const {
 	updatePresence,
 	sendWednesday
 } = common;
-
-const Command = require('./class/Command');
 
 const COMMAND_DIRECTORY = './commands';
 
@@ -69,59 +70,14 @@ client.on('ready', async () => {
 	common.filterReminders();
 	common.startAllReminders();
 
-	saveData();
-
+	// CUSTOM FUNCTION SETUP
+	common.loadCustomFunctions();
 });
 
 const notToDelete = [ 'reminder' ];
 
 // MESSAGE
-client.on('message', msg => {
-	if (msg.author.id === client.user.id) return false;
-	if (isCommand(msg)) {
-		handleCommand(msg);
-		if (msg.channel.type === 'dm' || msg.channel.type === 'group') return false;
-		if (msg.guild.me.permissions.has('MANAGE_MESSAGES')) {
-			if (!notToDelete.includes(getCommandName(msg))) {
-				setTimeout(function() {
-					msg.delete().catch(console.error);
-				}, 3000);
-			}
-		}
-	} else {
-		// Message is not a command
-		// Any actions for non-bot-message interactions that are not commands come here
-		// ->
-
-		let eatAss = msg.content.match(/(?:^|[\s])((eat\sass)|(eat\s.*\sass))(?=\s|$)/i);
-		let ummah = msg.content.match(/u((mah+)|(m{2,}ah*))/i);
-		if (msg.mentions.everyone) {
-			msg.channel.send("@everyone? Really? @everyone? Why would you ping @everyone, " + msg.author + "?");
-			return;
-		}
-		if (msg.isMentioned(client.user)) {
-			if (ummah) {
-				if (eatAss) {
-					msg.channel.send('Gladly, ' + msg.author + ' UwU');
-				} else {
-					msg.channel.send(msg.author + ' :kiss:');
-				}
-			} else if (eatAss) {
-				msg.channel.send('Hey, ' + msg.author + ', how about you eat mine?');
-			} else {
-				msg.channel.send('wassup ' + msg.author);
-			}
-		} else {
-			if (eatAss)	{
-				msg.channel.send('Hey, ' + msg.author + ', that\'s not very nice of you!');
-			} else if (Config.badWordFilter === true) {
-				if (msg.content.match(badWordsRegExp)) {
-					msg.channel.send('Whoa there buddy. You said a nasty word, ' + msg.author + '!')
-				}
-			}
-		}
-	}
-});
+client.on('message', handleMessage);
 
 // MESSAGE DELETED
 client.on('messageDelete', message => {
@@ -370,6 +326,49 @@ function setUpUser(msg, user) {
 	saveData();
 }
 
+//// MESSAGE HANDLING
+function handleMessage(msg) {
+	if (msg.author.id === client.user.id) return false;
+	if (isCommand(msg)) {
+		handleCommand(msg);
+		if (msg.channel.type === 'dm' || msg.channel.type === 'group') return false;
+		if (msg.guild.me.permissions.has('MANAGE_MESSAGES')) {
+			if (!notToDelete.includes(getCommandName(msg))) {
+				msg.delete(5000);
+			}
+		}
+	} else {
+		// Message is not a command, handle non-command interactions
+		let eatAss = msg.content.match(/(?:^|[\s])((eat\sass)|(eat\s.*\sass))(?=\s|$)/i);
+		let ummah = msg.content.match(/u((mah+)|(m{2,}ah*))/i);
+		if (msg.mentions.everyone) {
+			msg.channel.send("@everyone? Really? @everyone? Why would you ping @everyone, " + msg.author + "?");
+			return;
+		}
+		if (msg.isMentioned(client.user)) {
+			if (ummah) {
+				if (eatAss) {
+					msg.channel.send('Gladly, ' + msg.author + ' UwU');
+				} else {
+					msg.channel.send(msg.author + ' :kiss:');
+				}
+			} else if (eatAss) {
+				msg.channel.send('Hey, ' + msg.author + ', how about you eat mine?');
+			} else {
+				msg.channel.send('wassup ' + msg.author);
+			}
+		} else {
+			if (eatAss) {
+				msg.channel.send('Hey, ' + msg.author + ', that\'s not very nice of you!');
+			} else if (Config.badWordFilter === true) {
+				if (msg.content.match(badWordsRegExp)) {
+					msg.channel.send('Whoa there buddy. You said a nasty word, ' + msg.author + '!')
+				}
+			}
+		}
+	}
+}
+
 //// COMMAND HANDLING
 /**
  * Recursive function to execute a command - sub-command chain
@@ -471,7 +470,7 @@ function isCommand(msg) {
 
 /**
  * Get the name of the command in the message.
- * @param {*} msg 
+ * @param {*} msg
  */
 function getCommandName(msg) {
 	const split = msg.content.slice(Config.prefix.length).split(/ +/);
@@ -527,5 +526,4 @@ function handleCommand(msg) {
 }
 
 //// ENTRY POINT
-client.login(Config.token)
-	.catch(console.error);
+client.login(Config.token).catch(console.error);
