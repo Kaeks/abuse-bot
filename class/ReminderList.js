@@ -3,7 +3,7 @@ const { Discord } = common;
 
 const reactionEvents = require('../enum/ReactionEventEnum');
 const colors = require('../enum/EmbedColorEnum');
-const emojiNums = require('../enum/EmojiNumEnum')
+const emojiNums = require('../enum/EmojiNumEnum');
 
 // ms
 const LISTENING_TIME = 30 * 60 * 1000;
@@ -94,8 +94,11 @@ class ReminderList {
 
 	getFooterText(channel) {
 		let footerText = '';
-		if (channel.type !== 'dm') footerText += 'React with a number to join that reminder!';
-		if (this.pages > 1) footerText += ' Use ' + this.EMOJI_PREV + ' and ' + this.EMOJI_NEXT + ' to shuffle through the list.';
+		if (channel.type !== 'dm') footerText += 'React with a number to join that reminder!' + '\n';
+		if (this.pages > 1) {
+			footerText += 'Use ' + this.EMOJI_PREV + ' and ' + this.EMOJI_NEXT + ' to shuffle through the list.' + '\n';
+			footerText += this.getPageText() + '\n';
+		}
 		return footerText;
 	}
 
@@ -141,10 +144,12 @@ class ReminderList {
 		channel.send({embed : embed}).then(async message => {
 			this.msg = message;
 			this.startExpireTimer();
+
 			if (hasNext) {
-				await message.react(this.EMOJI_NEXT);
 				await message.react(this.EMOJI_PREV);
+				await message.react(this.EMOJI_NEXT);
 			}
+
 			if (channel.type !== 'dm') {
 				let max = hasNext ? this.ITEM_LIMIT : reminders.size;
 				for (let i = 0; i < max; i++) {

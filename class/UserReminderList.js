@@ -10,11 +10,12 @@ class UserReminderList extends ReminderList {
 	}
 
 	getFooterText(channel) {
-		let footerText = super.getFooterText(channel);
+		let footerText = '';
 		if (channel.type !== 'dm' || this.userMsg.author !== this.user) {
 			let userHandle = this.user.getHandle();
 			footerText += 'If the reminder was issued in a DM the link won\'t work for others except for ' + userHandle + '.\n'
 		}
+		footerText += super.getFooterText(channel);
 		return footerText;
 	}
 
