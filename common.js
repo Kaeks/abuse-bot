@@ -154,54 +154,24 @@ Discord.Collection.prototype.getSubList = function (limit, page = 0) {
 	return subList;
 };
 
-// CONSTANTS
-const CONFIG_PATH 	= './config.json';
-const DATA_PATH 	= './storage/data.json';
-const BLOCKED_PATH 	= './storage/blocked_users.json';
-const DELETED_PATH 	= './storage/deleted_messages.json';
-const EDITED_PATH 	= './storage/edited_messages.json';
-const REMINDER_PATH	= './storage/reminders.json';
-const CUSTOM_FUNC_PATH	= './storage/custom_functions.json';
+//// CONSTANTS
 
-const REMINDER_SIGNUP_EMOJI = '🙋';
-const PREF_CONFIRMATION_EMOJI_BASE = '👌';
+// CONFIG LOADING
 
-// DATA VARS
+const CONFIG_PATH = './config.json';
 let Config = {};
-let Storage = {};
-let Blocked = [];
-let Deleted = [];
-let Edited = [];
-let Reminders = [];
-let CustomFunctions = [];
+Config = loadFile(CONFIG_PATH, Config);
 
-// LOAD FILES
-Config =	loadFile(CONFIG_PATH, Config);
-Storage =	loadFile(DATA_PATH, Storage);
-Blocked =	loadFile(BLOCKED_PATH, Blocked);
-Deleted =	loadFile(DELETED_PATH, Deleted);
-Edited =	loadFile(EDITED_PATH, Edited);
-Reminders =	loadFile(REMINDER_PATH, Reminders);
-CustomFunctions =	loadFile(CUSTOM_FUNC_PATH, CustomFunctions);
+// CONFIG DEFAULT VALUES
+Config.prefix			= Config.prefix || '!';
+Config.token			= Config.token || null;
+Config.debug			= Config.debug || false;
+Config.ownerId			= Config.ownerId || null;
+Config.badWordFilter	= Config.badWordFilter || false;
+Config.devMode			= Config.devMode || false;
+Config.devToken			= Config.devToken || null;
 
-// SET DEFAULT VALUES
-Config.prefix = Config.prefix || '!';
-Config.token = Config.token || null;
-Config.debug = Config.debug !== undefined ? Config.debug : false;
-Config.ownerId = Config.ownerId || null;
-Config.badWordFilter = Config.badWordFilter || false;
-
-Storage.servers = Storage.servers || {};
-Storage.users = Storage.users || {};
-
-// SAVE FILES WITH POTENTIALLY UPDATED DATA
 saveFile(CONFIG_PATH, Config);
-saveFile(DATA_PATH, Storage);
-saveFile(BLOCKED_PATH, Blocked);
-saveFile(DELETED_PATH, Deleted);
-saveFile(EDITED_PATH, Edited);
-saveFile(REMINDER_PATH, Reminders);
-saveFile(CUSTOM_FUNC_PATH, CustomFunctions);
 
 // CHECK REQUIRED VALUES AND EXIT IF NECESSARY
 let canRunBot = true;
@@ -210,14 +180,60 @@ if (Config.token === null) {
 	warn('Property \'token\' missing in config.json!');
 	canRunBot = false;
 }
+
 if (Config.ownerId === null) {
 	warn(
 		'Property \'ownerId\' missing in config.json! Please fill in the ID of your discord user.' + '\n' +
 		'Without an ownerId it is not possible to perform actions that require a bot superuser.'
 	);
 }
+if (Config.devMode === true && Config.devToken === null) {
+	warn('Property \'devMode\' is enabled, but a \'devToken\' is missing in config.json!' + '\n' + 'Add a \'devToken\' or disable \'devMode\'.');
+	canRunBot = false;
+}
 
 if (!canRunBot) process.exit(1);
+
+const STORAGE_PATH = Config.devMode ? './storage/dev/' : './storage/';
+
+// STORAGE FILE PATHS
+const DATA_PATH			= STORAGE_PATH + 'data.json';
+const BLOCKED_PATH		= STORAGE_PATH + 'blocked_users.json';
+const DELETED_PATH		= STORAGE_PATH + 'deleted_messages.json';
+const EDITED_PATH		= STORAGE_PATH + 'edited_messages.json';
+const REMINDER_PATH		= STORAGE_PATH + 'reminders.json';
+const CUSTOM_FUNC_PATH	= STORAGE_PATH + 'custom_functions.json';
+
+const REMINDER_SIGNUP_EMOJI = '🙋';
+const PREF_CONFIRMATION_EMOJI_BASE = '👌';
+
+// DATA VARS
+let Storage = {};
+let Blocked = [];
+let Deleted = [];
+let Edited = [];
+let Reminders = [];
+let CustomFunctions = [];
+
+// LOAD FILES
+Storage			= loadFile(DATA_PATH, Storage);
+Blocked			= loadFile(BLOCKED_PATH, Blocked);
+Deleted			= loadFile(DELETED_PATH, Deleted);
+Edited			= loadFile(EDITED_PATH, Edited);
+Reminders		= loadFile(REMINDER_PATH, Reminders);
+CustomFunctions	= loadFile(CUSTOM_FUNC_PATH, CustomFunctions);
+
+// SET DEFAULT VALUES
+Storage.servers	= Storage.servers || {};
+Storage.users	= Storage.users || {};
+
+// SAVE FILES WITH POTENTIALLY UPDATED DATA
+saveFile(DATA_PATH, Storage);
+saveFile(BLOCKED_PATH, Blocked);
+saveFile(DELETED_PATH, Deleted);
+saveFile(EDITED_PATH, Edited);
+saveFile(REMINDER_PATH, Reminders);
+saveFile(CUSTOM_FUNC_PATH, CustomFunctions);
 
 // SHARED VARS
 let waterTimers			= new Discord.Collection();

@@ -40,11 +40,11 @@ for (const file of commandFiles) {
 
 // BAD WORDS
 let badWordsText = fs.readFileSync('./storage/badwords.txt', 'utf-8');
-let badWords = badWordsText.split('\r\n');
+let badWords = badWordsText.split(/\r\n?|\n/);
 
 let specialChars = '[ ^°"$%&/()=?{}\\[\\]\\\\`´*+~#\'\\-_.:,;<>|]';
 let joinedBadWords = badWords.join('|');
-let badWordsRegExp = new RegExp('(?:^|' + specialChars + ')(' + joinedBadWords + ')(?:$|' + specialChars + ')');
+let badWordsRegExp = new RegExp('(?<=^|' + specialChars + ')(' + joinedBadWords + ')(?=$|' + specialChars + ')');
 
 //// EVENTS
 // START
@@ -526,4 +526,4 @@ function handleCommand(msg) {
 }
 
 //// ENTRY POINT
-client.login(Config.token).catch(console.error);
+client.login(Config.devMode ? Config.devToken : Config.token).catch(console.error);
