@@ -228,8 +228,15 @@ let commandReminderDisplayAll = new SubCommand('all', argumentValues.NONE)
 let commandReminderDisplay = new SubCommand('display', argumentValues.REQUIRED, permissionLevels.BOT_SUPERUSER)
 	.addDoc('<user>', 'Display all reminders of a user.')
 	.addSub(commandReminderDisplayAll)
-	.setExecute((msg, suffix) => {
-
+	.setExecute(async (msg, suffix) => {
+		let users = common.client.users;
+		let mentions = msg.mentions;
+		let user;
+		if (users.has(suffix)) user = users.get(suffix);
+		else if (mentions.users.size > 0) user = msg.mentions.users.first();
+		else throw 'WRONG';
+		let reminderList = new UserReminderList(msg, user);
+		await reminderList.build(await msg.author.getDmChannel());
 	});
 
 let commandReminder =

@@ -94,7 +94,7 @@ class ReminderList {
 
 	getFooterText(channel) {
 		let footerText = '';
-		if (channel.type !== 'dm') footerText += 'React with a number to join that reminder!' + '\n';
+		if (channel.type !== 'dm') footerText += 'React with a number to join or leave that reminder!' + '\n';
 		if (this.pages > 1) {
 			footerText += 'Use ' + this.EMOJI_PREV + ' and ' + this.EMOJI_NEXT + ' to shuffle through the list.' + '\n';
 			footerText += this.getPageText() + '\n';
@@ -103,16 +103,9 @@ class ReminderList {
 	}
 
 	getEmbed(channel) {
-		// Throw error when we are on a page that doesn't exist with the amount of reminders the user has
-		// e.g. page 1000 does not exist with only 10 reminders
-		if (this.reminders.size < this.curPage * this.ITEM_LIMIT + 1) {
-			throw 'Size of the collection of reminders is too small for the given page count (' + this.curPage + ').';
-		}
-
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.GREEN)
-			.setTitle('Reminders!')
-			.setFooter(this.getFooterText(channel));
+			.setTitle('Reminders!');
 
 		// Return special message for empty collection
 		if (this.reminders.size === 0) {
@@ -120,10 +113,11 @@ class ReminderList {
 			return embed;
 		}
 
-		let tempText = '';
+		embed.setFooter(this.getFooterText(channel));
 
 		let subList = this.reminders.simplify().getSubList(this.ITEM_LIMIT, this.curPage);
 		let listIterator = 0;
+		let tempText = '';
 		subList.forEach((reminder, index) => {
 			if (channel.type !== 'dm') tempText += '(' + emojiNums[listIterator] + ')';
 			tempText += reminder.getSingleLine(index);
@@ -136,12 +130,16 @@ class ReminderList {
 		return embed;
 	}
 
+	/**
+	 * Builds the reminder list in a specified channel
+	 * @param channel
+	 */
 	build(channel) {
 		let reminders = this.reminders;
 		let hasNext = this.ITEM_LIMIT < reminders.size;
 		let embed = this.getEmbed(channel);
 
-		channel.send({embed : embed}).then(async message => {
+		channel.send({ embed: embed }).then(async message => {
 			this.msg = message;
 			this.startExpireTimer();
 
@@ -167,15 +165,22 @@ class ReminderList {
 				}
 			}, [ this.EMOJI_PREV, this.EMOJI_NEXT ]);
 
-			common.addReactionListener(message, (messageReaction, user, event) => {
+			common.addReactionListener(message, (messageReaction, user) => {
 				this.resetExpireTimer();
 				let index = Object.values(emojiNums).indexOf(messageReaction.emoji.name);
 				let reminder = this.getReminderOfCurList(index);
-				if (event === reactionEvents.ADD) {
-					reminder.addUser(user);
-				} else if (event === reactionEvents.REMOVE) {
-					reminder.removeUser(user);
-				}
+				let newStatus = reminder.toggleUser(user);
+				let reminderToggleEmbed = new Discord.RichEmbed()
+					.setColor(colors.PRESTIGE)
+					.setTitle((newStatus ? 'Joined' : 'Left') + ' reminder!')
+					.setDescription(
+						'I will ' +
+						(newStatus ? 'now' : 'no longer') +
+						' remind you ' +
+						(reminder.task.length > 0 ? 'about\n> ' + reminder.task + '\n' : '') +
+						'on ' + reminder.date + '.'
+					);
+				user.sendDm({ embed: reminderToggleEmbed });
 			}, Object.values(emojiNums));
 		});
 	}
