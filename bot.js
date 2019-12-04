@@ -344,7 +344,8 @@ function handleMessage(msg) {
 			msg.channel.send("@everyone? Really? @everyone? Why would you ping @everyone, " + msg.author + "?");
 			return;
 		}
-		if (msg.isMentioned(client.user)) {
+		let saidBadWord = Config.badWordFilter === true && msg.content.match(badWordsRegExp);
+		if (msg.isMentioned(client.user) || msg.channel.type === 'dm') {
 			if (ummah) {
 				if (eatAss) {
 					msg.channel.send('Gladly, ' + msg.author + ' UwU');
@@ -353,16 +354,16 @@ function handleMessage(msg) {
 				}
 			} else if (eatAss) {
 				msg.channel.send('Hey, ' + msg.author + ', how about you eat mine?');
-			} else {
+			} else if (saidBadWord) {
+				msg.channel.send('No u, ' + msg.author + '.');
+			} else if (msg.isMentioned(client.user)) {
 				msg.channel.send('wassup ' + msg.author);
 			}
 		} else {
 			if (eatAss) {
 				msg.channel.send('Hey, ' + msg.author + ', that\'s not very nice of you!');
-			} else if (Config.badWordFilter === true) {
-				if (msg.content.match(badWordsRegExp)) {
-					msg.channel.send('Whoa there buddy. You said a nasty word, ' + msg.author + '!')
-				}
+			} else if (saidBadWord) {
+				msg.channel.send('Whoa there buddy. Mind your language, ' + msg.author + ', there\'s kids around!')
 			}
 		}
 	}
