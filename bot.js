@@ -74,8 +74,6 @@ client.on('ready', async () => {
 	common.loadCustomFunctions();
 });
 
-const notToDelete = [ 'reminder' ];
-
 // MESSAGE
 client.on('message', handleMessage);
 
@@ -326,16 +324,17 @@ function setUpUser(msg, user) {
 	saveData();
 }
 
-//// MESSAGE HANDLING
+/**
+ * Handles an incoming message
+ * @param msg
+ */
 function handleMessage(msg) {
-	if (msg.author.id === client.user.id) return false;
+	if (msg.author.id === client.user.id) return;
 	if (isCommand(msg)) {
-		handleCommand(msg);
-		if (msg.channel.type === 'dm' || msg.channel.type === 'group') return false;
-		if (msg.guild.me.permissions.has('MANAGE_MESSAGES')) {
-			if (!notToDelete.includes(getCommandName(msg))) {
+		let executedCommand = handleCommand(msg);
+		if (msg.channel.type === 'dm' || msg.channel.type === 'group') return;
+		if (msg.guild.me.permissions.has('MANAGE_MESSAGES') && (executedCommand === null || executedCommand.delete === true)) {
 				msg.delete(5000);
-			}
 		}
 	} else {
 		// Message is not a command, handle non-command interactions
@@ -371,79 +370,6 @@ function handleMessage(msg) {
 
 //// COMMAND HANDLING
 /**
- * Recursive function to execute a command - sub-command chain
- * @param msg
- * @param suffix
- * @param command
- * @returns {boolean} success
- */
-function findSubCommand(msg, suffix, command) {
-	// Variable for determining whether a (sub-)command can be executed with the suffix or not
-	let isValidUse = false;
-
-	if (suffix == null) {
-		// Suffix is empty
-		// Command doesn't require arguments ✔
-		// Command doesn't have a standalone function ✔
-		if (![argumentValues.REQUIRED, argumentValues.NULL].includes(command.args)) isValidUse = true;
-	} else {
-		// Suffix is not empty
-		// Get a list individual (possible) sub-commands
-		let splitList = suffix.split(/ +/);
-		let firstArg = splitList[0];
-
-		// If there is a sub-command, go through to it and look recursively
-		// If there is no sub-command and the current command accepts / requires arguments, continue with execution
-		if (command.sub.has(firstArg)) {
-			let temp = suffix.substring(firstArg.length);
-			let match = temp.match(/ +/);
-			let subCommand = command.sub.get(firstArg);
-
-			let user = msg.author;
-
-			if (user.getPermissionLevel(msg) < subCommand.permissionLevel) {
-				common.debug('User ' + user.getHandle() + ' does not have the required permission level for that sub-command.');
-				msg.channel.send('I\'m sorry, ' + user + ', you do not have permission to execute that sub-command.');
-				return false;
-			}
-
-			let newSuffix = match !== null ? temp.substring(match[0].length) : null;
-
-			return findSubCommand(msg, newSuffix, subCommand);
-		} else if (command.args === argumentValues.REQUIRED || command.args === argumentValues.OPTIONAL) {
-			isValidUse = true;
-		}
-	}
-
-	// If the use is valid, execute it
-	// If the use is not valid, display help
-	let commandString = common.combineCommandChain(command.getCommandChain());
-	if (isValidUse) {
-		let suffixString = suffix == null ? '' : ' with suffix: \'' + suffix + '\'';
-		common.log('User ' + msg.author.getHandle() + ' issued command \'' + commandString + '\'' + suffixString + '.');
-		if (command.hasOwnProperty('execute')) {
-			command.execute(msg, suffix);
-			return true;
-		} else {
-			common.warn('Command \'' + commandString + '\' has not been implemented.');
-			let embed = new Discord.RichEmbed()
-				.setColor(colors.RED)
-				.setTitle('Not available!')
-				.setDescription('The command `' + Config.prefix + commandString + '` doesn\'t have an implemented function.');
-			msg.channel.send({ embed: embed });
-			return false;
-		}
-	} else {
-		let embed = new Discord.RichEmbed()
-			.setColor(colors.GREEN)
-			.setTitle('Help for ' + commandString);
-			embed.setDescription(common.getCommandHelp(command));
-		msg.channel.send({ embed: embed });
-	}
-	return false;
-}
-
-/**
  * Returns whether or not a user is blocked from using bot features.
  * @param user
  * @returns {boolean}
@@ -478,9 +404,82 @@ function getCommandName(msg) {
 }
 
 /**
+ * Recursive function to execute a command - sub-command chain
+ * @param msg
+ * @param suffix
+ * @param command
+ * @returns {Command} the executed subCommand
+ */
+function findSubCommand(msg, suffix, command) {
+	// Variable for determining whether a (sub-)command can be executed with the suffix or not
+	let isValidUse = false;
+
+	if (suffix == null) {
+		// Suffix is empty
+		// Command doesn't require arguments ✔
+		// Command doesn't have a standalone function ✔
+		if (![argumentValues.REQUIRED, argumentValues.NULL].includes(command.args)) isValidUse = true;
+	} else {
+		// Suffix is not empty
+		// Get a list of individual (possible) sub-commands
+		let splitList = suffix.split(/ +/);
+		let firstArg = splitList[0];
+
+		// If there is a sub-command, go through to it and look recursively
+		// If there is no sub-command and the current command accepts / requires arguments, continue with execution
+		if (command.sub.has(firstArg)) {
+			let temp = suffix.substring(firstArg.length);
+			let match = temp.match(/ +/);
+			let subCommand = command.sub.get(firstArg);
+
+			let user = msg.author;
+
+			if (user.getPermissionLevel(msg) < subCommand.permissionLevel) {
+				common.debug('User ' + user.getHandle() + ' does not have the required permission level for that sub-command.');
+				msg.channel.send('I\'m sorry, ' + user + ', you do not have permission to execute that sub-command.');
+				return null;
+			}
+
+			let newSuffix = match !== null ? temp.substring(match[0].length) : null;
+
+			return findSubCommand(msg, newSuffix, subCommand);
+		} else if (command.args === argumentValues.REQUIRED || command.args === argumentValues.OPTIONAL) {
+			isValidUse = true;
+		}
+	}
+
+	// If the use is valid, execute it
+	// If the use is not valid, display help
+	let commandString = common.combineCommandChain(command.getCommandChain());
+	if (isValidUse) {
+		let suffixString = suffix == null ? '' : ' with suffix: \'' + suffix + '\'';
+		common.log('User ' + msg.author.getHandle() + ' issued command \'' + commandString + '\'' + suffixString + '.');
+		if (command.hasOwnProperty('execute')) {
+			command.execute(msg, suffix);
+			return command;
+		} else {
+			common.warn('Command \'' + commandString + '\' has not been implemented.');
+			let embed = new Discord.RichEmbed()
+				.setColor(colors.RED)
+				.setTitle('Not available!')
+				.setDescription('The command `' + Config.prefix + commandString + '` doesn\'t have an implemented function.');
+			msg.channel.send({ embed: embed });
+			return null;
+		}
+	} else {
+		let embed = new Discord.RichEmbed()
+			.setColor(colors.GREEN)
+			.setTitle('Help for ' + commandString);
+		embed.setDescription(common.getCommandHelp(command));
+		msg.channel.send({ embed: embed });
+	}
+	return null;
+}
+
+/**
  * Handles a command inside a message
  * @param msg
- * @returns {boolean} success
+ * @returns {Command} the executed command
  */
 function handleCommand(msg) {
 	let user = msg.author;
@@ -488,7 +487,7 @@ function handleCommand(msg) {
 	if (isBlocked(user)) {
 		common.debug('User ' + user.getHandle() + ' is on blocked user list.');
 		msg.channel.send('I\'m sorry, ' + user + ', you\'ve been blocked from using me.');
-		return false;
+		return null;
 	}
 
 	// Create database space for the message author
@@ -503,7 +502,7 @@ function handleCommand(msg) {
 	if (user.getPermissionLevel(msg) < commandPermissionLevel) {
 		common.debug('User ' + user.getHandle() + ' does not have the required permission level for that command.');
 		msg.channel.send('I\'m sorry, ' + user + ', you do not have permission to execute that command.');
-		return false;
+		return null;
 	}
 
 	let temp = msg.content.substring(Config.prefix.length + commandName.length);
@@ -512,8 +511,7 @@ function handleCommand(msg) {
 	const suffix = match !== null ? temp.substring(match[0].length) : null;
 	common.debug('suffix: ' + suffix);
 	try {
-		findSubCommand(msg, suffix, command);
-		return true;
+		return findSubCommand(msg, suffix, command);
 	} catch (e) {
 		console.error(e.stack);
 		let embed = new Discord.RichEmbed()
@@ -522,7 +520,7 @@ function handleCommand(msg) {
 			.setDescription('Command `' + commandName + '` failed.');
 		msg.channel.send({ embed: embed });
 	}
-	return false;
+	return null;
 }
 
 //// ENTRY POINT

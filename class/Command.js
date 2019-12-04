@@ -12,6 +12,7 @@ class Command {
 	permissionLevel;
 	sub = new Discord.Collection();
 	doc = [];
+	delete = true;
 
 	/**
 	 * Constructor
@@ -63,6 +64,16 @@ class Command {
 	 */
 	setExecute(fn) {
 		this.execute = fn;
+		return this;
+	}
+
+	/**
+	 * Sets whether or not messages that execute this command should be deleted
+	 * @param {Boolean} bool
+	 * @returns {Command}
+	 */
+	setDelete(bool) {
+		this.delete = bool;
 		return this;
 	}
 

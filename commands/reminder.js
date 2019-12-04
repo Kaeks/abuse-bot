@@ -16,7 +16,8 @@ let commandReminderAdd = new SubCommand('add', argumentValues.REQUIRED)
 	.addDoc(
 		'<time/date> [-m <message]',
 		'Add a reminder that will remind you until either <time> has passed or remind you on <date>. Optional message after token [-m].'
-	).setExecute((msg, suffix) => {
+	).setDelete(false)
+	.setExecute((msg, suffix) => {
 		let optionString = ' -m';
 		let mPosition = suffix.indexOf(optionString);
 
