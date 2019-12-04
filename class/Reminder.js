@@ -173,6 +173,26 @@ class Reminder {
 		return true;
 	}
 
+	/**
+	 * Toggles the status of a user on this reminder
+	 * @param user
+	 * @return {boolean} new state of the user on this reminder
+	 */
+	toggleUser(user) {
+		if (this.users.includes(user)) {
+			this.removeUser(user);
+			return false;
+		} else {
+			this.addUser(user);
+			return true;
+		}
+	}
+
+	/**
+	 * Gets the single line string of the reminder
+	 * @param listPosition
+	 * @returns {string}
+	 */
 	getSingleLine(listPosition) {
 		let positionString = ' **#' + listPosition + '**';
 		let linkString = '[' + common.parseDate(this.date) + '](<' + this.userMsg.getLink() + '>)';

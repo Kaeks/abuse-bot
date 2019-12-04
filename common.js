@@ -145,6 +145,11 @@ Discord.Collection.prototype.simplify = function () {
  * @returns {Discord.Collection<*, *>}
  */
 Discord.Collection.prototype.getSubList = function (limit, page = 0) {
+
+	if (this.size < page * limit + 1) {
+		throw 'Collection size (' + this.size + ') with limit (' + limit + ') is too small for the given page count (' + this.curPage + ').';
+	}
+
 	let subList = new Discord.Collection();
 	for (let i = page * limit; i < limit * (page + 1); i++) {
 		let cur = this.array()[i];
