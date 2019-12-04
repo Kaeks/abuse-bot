@@ -445,56 +445,40 @@ async function readReminders() {
 	return collection;
 }
 
+function formatMsg(msg) {
+	let msgEntry = {
+		id: msg.id,
+		channel: {
+			id: msg.channel.id,
+			type: msg.channel.type
+		}
+	};
+	if (msg.channel.type === 'dm') {
+		msgEntry.channel.recipient = {
+			id: msg.channel.recipient.id
+		}
+	}
+	return msgEntry;
+}
+
+function formatReminder(reminder) {
+	return {
+		id : reminder.id,
+		users : reminder.users.map(val => val.id),
+		userMsg : formatMsg(reminder.userMsg),
+		botMsg : reminder.botMsg != null ? formatMsg(reminder.botMsg) : null,
+		date : reminder.date,
+		task : reminder.task
+	};
+}
+
 /**
  * Formats the list of cached reminders into a save-able form
  */
 function formatReminders() {
 	let shortReminders = new Discord.Collection();
 	reminders.forEach((reminder, id) => {
-
-		let botMsg;
-
-		if (reminder.botMsg != null) {
-			botMsg = {
-				id : reminder.botMsg.id,
-				channel : {
-					id : reminder.botMsg.channel.id,
-					type : reminder.botMsg.channel.type
-				}
-			};
-			if (botMsg.channel.type === 'dm') {
-				botMsg.channel.recipient = {
-					id : reminder.botMsg.channel.recipient.id
-				};
-			}
-		} else {
-			botMsg = null;
-		}
-
-		let userMsg = {
-			id : reminder.userMsg.id,
-			channel : {
-				id : reminder.userMsg.channel.id,
-				type : reminder.userMsg.channel.type
-			}
-		};
-		if (userMsg.channel.type === 'dm') {
-			userMsg.channel.recipient = {
-				id : reminder.userMsg.channel.recipient.id
-			};
-		}
-
-		let shortUsers = reminder.users.map(val => val.id);
-
-		let shortReminder = {
-			id : id,
-			users : shortUsers,
-			userMsg : userMsg,
-			botMsg : botMsg,
-			date : reminder.date,
-			task : reminder.task
-		};
-		shortReminders.set(id, shortReminder);
+		shortReminders.set(id, formatReminder(reminder));
 	});
 	return shortReminders;
 }
