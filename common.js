@@ -263,7 +263,7 @@ const timeSpans = require('./enum/TimeSpanEnum');
 //// EXPORTS
 module.exports = {
 	Discord, fs, chrono,
-	client,
+	client, getOwner,
 	Config, Storage, Blocked, Deleted, Edited,
 	saveFile,
 	saveConfig, saveData, saveBlocked, saveDeleted, saveEdited, saveReminders, saveWaterTimers, saveCustomFunctions,

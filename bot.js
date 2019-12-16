@@ -11,9 +11,6 @@ const reactionEvents = require('./enum/ReactionEventEnum');
 const permissionLevels = require('./enum/PermissionLevelEnum');
 const roleNames = require('./enum/RoleNameEnum');
 
-// Catch UnhandledPromiseRejection
-process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection', error));
-
 /// EXPORTS
 module.exports = {
 	Discord, chrono, client
@@ -28,6 +25,20 @@ const {
 	updatePresence,
 	sendWednesday
 } = common;
+
+// Catch UnhandledPromiseRejection
+process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection', error));
+
+// Catch fatal errors and send a message to the bot owner before exiting
+process.on('uncaughtException', async error => {
+	console.error('Uncaught Exception', error);
+	let errorEmbed = new Discord.RichEmbed()
+		.setColor(colors.RED)
+		.setTitle('Fatal uncaught exception!')
+		.setDescription(error);
+	await common.getOwner().sendDm({ embed: errorEmbed });
+	process.exit(1);
+});
 
 const COMMAND_DIRECTORY = './commands';
 
@@ -100,7 +111,7 @@ client.on('messageDelete', message => {
 		}
 	};
 	if (message.embeds.length > 0) {
-		shortened.embeds = message.embeds;
+		shortened.embeds = 'yes';
 	}
 	if (message.attachments.size > 0) {
 		let shortenedAttachments = [];
