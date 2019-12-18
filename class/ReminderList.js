@@ -1,19 +1,18 @@
 const common = require('../common');
 const { Discord } = common;
 
-const reactionEvents = require('../enum/ReactionEventEnum');
-const colors = require('../enum/EmbedColorEnum');
-const emojiNums = require('../enum/EmojiNumEnum');
+const enums = require('../enum');
+
+const { reactionEvents, colors, emojiNums } = enums;
+
+const MessageHandler = require('./MessageHandler');
 
 // ms
 const LISTENING_TIME = 30 * 60 * 1000;
 
-class ReminderList {
-	id;
+class ReminderList extends MessageHandler {
 	reminders;
-	userMsg;
-	msg;
-	curPage = 0;
+	page;
 	pages;
 	expireDate;
 	timer;
@@ -22,10 +21,10 @@ class ReminderList {
 	EMOJI_PREV = '◀';
 	EMOJI_NEXT = '▶';
 
-	constructor(userMsg, collection) {
-		this.id = Discord.SnowflakeUtil.generate();
+	constructor(channel, collection, page = 0) {
+		super(channel);
 		this.reminders = collection;
-		this.userMsg = userMsg;
+		this.page = page;
 		this.pages = Math.ceil(collection.size / this.ITEM_LIMIT);
 	}
 
@@ -51,13 +50,13 @@ class ReminderList {
 
 	delete() {
 		this.stopExpireTimer();
-		this.msg.delete().catch(console.error);
+		this.message.delete().catch(console.error);
 		common.debug('Deleted reminder list with id ' + this.id + '.');
 	}
 
 	getReminderOfCurList(num) {
 		let iterator = 0;
-		for (let reminderEntry of this.reminders.getSubList(this.ITEM_LIMIT, this.curPage)) {
+		for (let reminderEntry of this.reminders.getSubList(this.ITEM_LIMIT, this.page)) {
 			if (iterator === num) {
 				return reminderEntry[1];
 			}
@@ -65,36 +64,30 @@ class ReminderList {
 		}
 	}
 
-	updateMessage() {
-		let updatedEmbed = this.getEmbed(this.msg.channel);
-		this.msg.edit(updatedEmbed).catch(console.error);
-		common.debug('Updated message of reminder list with id ' + this.id + '.');
-	}
-
 	changePage(page) {
 		if (page < 0) throw 'Attempted to access page smaller than 0.';
 		if (page + 1 > this.pages) throw 'Page ' + page + ' doesn\'t exist for reminderList ' + this.id + '.';
-		this.curPage = page;
+		this.page = page;
 		this.updateMessage();
 	}
 
 	goNextPage() {
-		if (this.curPage + 1 >= this.pages) return false;
-		this.changePage(this.curPage + 1);
+		if (this.page + 1 >= this.pages) return false;
+		this.changePage(this.page + 1);
 	}
 
 	goPrevPage() {
-		if (this.curPage === 0) return false;
-		this.changePage(this.curPage - 1);
+		if (this.page === 0) return false;
+		this.changePage(this.page - 1);
 	}
 
 	getPageText() {
-		return this.pages > 1 ? 'Page ' + (this.curPage + 1) + ' of ' + this.pages : '';
+		return this.pages > 1 ? 'Page ' + (this.page + 1) + ' of ' + this.pages : '';
 	}
 
-	getFooterText(channel) {
+	getFooterText() {
 		let footerText = '';
-		if (channel.type !== 'dm') footerText += 'React with a number to join or leave that reminder!' + '\n';
+		if (this.channel.type !== 'dm') footerText += 'React with a number to join or leave that reminder!' + '\n';
 		if (this.pages > 1) {
 			footerText += 'Use ' + this.EMOJI_PREV + ' and ' + this.EMOJI_NEXT + ' to shuffle through the list.' + '\n';
 			footerText += this.getPageText() + '\n';
@@ -102,7 +95,7 @@ class ReminderList {
 		return footerText;
 	}
 
-	getEmbed(channel) {
+	async getEmbed() {
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.GREEN)
 			.setTitle('Reminders!');
@@ -113,13 +106,13 @@ class ReminderList {
 			return embed;
 		}
 
-		embed.setFooter(this.getFooterText(channel));
+		embed.setFooter(this.getFooterText());
 
-		let subList = this.reminders.simplify().getSubList(this.ITEM_LIMIT, this.curPage);
+		let subList = this.reminders.simplify().getSubList(this.ITEM_LIMIT, this.page);
 		let listIterator = 0;
 		let tempText = '';
 		subList.forEach((reminder, index) => {
-			if (channel.type !== 'dm') tempText += '(' + emojiNums[listIterator] + ')';
+			if (this.channel.type !== 'dm') tempText += '(' + emojiNums[listIterator] + ')';
 			tempText += reminder.getSingleLine(index);
 			listIterator++;
 			if (index !== subList.lastKey) tempText += '\n';
@@ -131,16 +124,15 @@ class ReminderList {
 	}
 
 	/**
-	 * Builds the reminder list in a specified channel
-	 * @param channel
+	 * Builds the reminder list
 	 */
-	build(channel) {
-		let reminders = this.reminders;
-		let hasNext = this.ITEM_LIMIT < reminders.size;
-		let embed = this.getEmbed(channel);
+	async build() {
+		await super.build();
+		let hasNext = this.ITEM_LIMIT < this.reminders.size;
+		let initialEmbed = await this.getEmbed(this.channel);
 
-		channel.send({ embed: embed }).then(async message => {
-			this.msg = message;
+		this.channel.send({ embed: initialEmbed }).then(async message => {
+			this.message = message;
 			this.startExpireTimer();
 
 			if (hasNext) {
@@ -148,8 +140,8 @@ class ReminderList {
 				await message.react(this.EMOJI_NEXT);
 			}
 
-			if (channel.type !== 'dm') {
-				let max = hasNext ? this.ITEM_LIMIT : reminders.size;
+			if (this.channel.type !== 'dm') {
+				let max = hasNext ? this.ITEM_LIMIT : this.reminders.size;
 				for (let i = 0; i < max; i++) {
 					let curEmoji = emojiNums[i];
 					await message.react(curEmoji);

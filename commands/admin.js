@@ -1,14 +1,14 @@
 const common = require('../common');
 const { Discord, fs } = common;
 
-const Command = require('../class/Command');
-const SubCommand = require('../class/SubCommand');
+const classes = require('../class');
+const { Command, SubCommand, EditedMessageHandler } = classes;
+
 
 const DUMP_DIRECTORY = 'dumps';
 
-const argumentValues = require('../enum/ArgumentValueEnum');
-const permissionLevels = require('../enum/PermissionLevelEnum');
-const dumpTypes = require('../enum/DumpTypeEnum');
+const enums = require('../enum');
+const { argumentValues, permissionLevels, dumpTypes, colors } = enums;
 
 let commandAdminClean = new SubCommand('clean', argumentValues.NONE, permissionLevels.SERVER_SUPERUSER)
 	.addDoc('', 'I clean up after myself.')

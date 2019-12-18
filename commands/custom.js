@@ -7,6 +7,8 @@ const Command = require('../class/Command');
 const SubCommand = require('../class/SubCommand');
 const CustomFunction = require('../class/CustomFunction');
 
+const ConfirmationMessageHandler = require('../class/ConfirmationMessageHandler');
+
 // IMPORT ALL ENUMS
 const enums = require('../enum');
 const { argumentValues, permissionLevels, colors } = enums;
@@ -20,45 +22,18 @@ let commandCustomAdd = new SubCommand('add', argumentValues.REQUIRED)
 		let match = temp.match(/ +/);
 		let fn = match !== null ? temp.substring(match[0].length) : null;
 		if (common.customFunctions.has(name)) {
-			const CONFIRMATION_TIMEOUT = 30;
-			let existsEmbed = new Discord.RichEmbed()
-				.setColor(colors.PURPLE)
-				.setTitle('Already exists!')
-				.setDescription(
-					'A custom command with the name `' + name + '` already exists.' + '\n'
-					+ 'Do you want to replace it?'
-				).setFooter('React with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
-			msg.channel.send({ embed: existsEmbed }).then(message => {
-				message.react(common.PREF_CONFIRMATION_EMOJI_BASE);
-				message.awaitReactions((reaction, reactor) => {
-					return Object.values(enums.confirmationEmojis).includes(reaction.emoji.name) && reactor === user
-				}, {
-					time : CONFIRMATION_TIMEOUT * enums.timeSpans.SECOND,
-					max : 1,
-					errors : ['time']
-				}).then(collected => {
-					createCustomFunctionEntry(msg, name, fn, user);
-					let reactionEmojiName = collected.first().emoji.name;
-					let reactionEmojiBase = reactionEmojiName.substring(0,2);
-					let friendlyDescription = common.PREF_CONFIRMATION_EMOJI_BASE + ' Replaced the custom function `' + name + '`.';
-					let rudeDescription = 'Listen up, kid. You were supposed to react with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' and not '
-						+ reactionEmojiName + '.' + '\n'
-						+ 'I\'ll let that slip this time and replaced the custom function `' + name + '`.';
-					let successEmbed = new Discord.RichEmbed()
-						.setColor(colors.GREEN)
-						.setTitle('Replaced custom function!')
-						.setDescription(reactionEmojiBase === common.PREF_CONFIRMATION_EMOJI_BASE ? friendlyDescription : rudeDescription);
-					message.edit({ embed: successEmbed });
-				}).catch(() => {
-					let abortedEmbed = new Discord.RichEmbed()
-						.setColor(colors.RED)
-						.setTitle('Confirmation timed out!')
-						.setDescription('You did not confirm your action. Process aborted.');
-					message.edit({ embed: abortedEmbed }).then(editedMessage => {
-						editedMessage.delete(5000);
-					});
-				});
+
+			let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => {
+				createCustomFunctionEntry(msg, name, fn, user);
+			}, {
+				users : [ user ],
+				initialDesc : 'A custom command with the name `' + name + '` already exists.' + '\n' + 'Do you want to replace it?',
+				initialTitle : 'Already exists!',
+				acceptDesc : 'Replaced the custom function `' + name + '`.',
+				acceptTitle : 'Replaced custom function!',
+				altAcceptDesc : 'replaced the custom function `' + name + '`.'
 			});
+			confirmationHandler.build();
 		} else {
 			createCustomFunctionEntry(msg, name, fn, user);
 		}
@@ -94,52 +69,25 @@ let commandCustomRemoveAll = new SubCommand('all', argumentValues.NONE)
 			msg.channel.send({ embed: foundNoneEmbed });
 		}
 		let user = msg.author;
-		// Timeout for confirmation reaction in seconds
-		const CONFIRMATION_TIMEOUT = 30;
 
-		let confirmationEmbed = new Discord.RichEmbed()
-			.setColor(colors.PURPLE)
-			.setTitle('Are you sure?')
-			.setDescription('You are about to remove **ALL** custom functions. Is that ' + common.PREF_CONFIRMATION_EMOJI_BASE + '?')
-			.setFooter('React with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
-		msg.channel.send({ embed: confirmationEmbed }).then(message => {
-			message.react(common.PREF_CONFIRMATION_EMOJI_BASE);
-			message.awaitReactions((reaction, reactor) => {
-				return Object.values(enums.confirmationEmojis).includes(reaction.emoji.name) && reactor === user
-			}, {
-				time : CONFIRMATION_TIMEOUT * enums.timeSpans.SECOND,
-				max : 1,
-				errors : ['time']
-			}).then(collected => {
-				if (!common.deleteAllCustomFunctions()) {
-					let errorEmbed = new Discord.RichEmbed()
-						.setColor(colors.RED)
-						.setTitle('Oops!')
-						.setDescription('Something went wrong when trying to remove all custom functions.');
-					msg.channel.send({embed : errorEmbed});
-					return false;
-				}
-				let reactionEmojiName = collected.first().emoji.name;
-				let reactionEmojiBase = reactionEmojiName.substring(0,2);
-				let friendlyDescription = common.PREF_CONFIRMATION_EMOJI_BASE + ' Successfully removed all custom functions.';
-				let rudeDescription = 'Listen up, kid. You were supposed to react with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' and not '
-					+ reactionEmojiName + '.' + '\n'
-					+ 'I\'ll let that slip this time and removed all custom functions.';
-				let successEmbed = new Discord.RichEmbed()
-					.setColor(colors.GREEN)
-					.setTitle('Removed all custom functions!')
-					.setDescription(reactionEmojiBase === common.PREF_CONFIRMATION_EMOJI_BASE ? friendlyDescription : rudeDescription);
-				message.edit({ embed: successEmbed });
-			}).catch(() => {
-				let abortedEmbed = new Discord.RichEmbed()
+		let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => {
+			if (!common.deleteAllCustomFunctions()) {
+				let errorEmbed = new Discord.RichEmbed()
 					.setColor(colors.RED)
-					.setTitle('Confirmation timed out!')
-					.setDescription('You did not confirm your action. Process aborted.');
-				message.edit({ embed: abortedEmbed }).then(editedMessage => {
-					editedMessage.delete(5000);
-				});
-			});
+					.setTitle('Oops!')
+					.setDescription('Something went wrong when trying to remove all custom functions.');
+				msg.channel.send({embed : errorEmbed});
+				return false;
+			}
+		}, {
+			users : [ user ],
+			initialDesc : 'You are about to remove **ALL** custom functions. Do you want to proceed?',
+			initialTitle : 'Are you sure?',
+			acceptDesc : 'Successfully removed all custom functions.',
+			acceptTitle : 'Removed all custom functions!',
+			altAcceptDesc : 'removed all custom functions.'
 		});
+		confirmationHandler.build();
 	});
 
 let commandCustomRemove = new SubCommand('remove', argumentValues.REQUIRED)
@@ -154,54 +102,28 @@ let commandCustomRemove = new SubCommand('remove', argumentValues.REQUIRED)
 			msg.channel.send({ embed: notFoundEmbed });
 			return false;
 		}
-		let user = msg.author;
-		// Timeout for confirmation reaction in seconds
-		const CONFIRMATION_TIMEOUT = 30;
 
-		let confirmationEmbed = new Discord.RichEmbed()
-			.setColor(colors.PURPLE)
-			.setTitle('Are you sure?')
-			.setDescription('You are about to remove the custom function ' + suffix + '. Is that ' + common.PREF_CONFIRMATION_EMOJI_BASE + '?')
-			.setFooter('React with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
-		msg.channel.send({ embed: confirmationEmbed }).then(message => {
-			message.react(common.PREF_CONFIRMATION_EMOJI_BASE);
-			message.awaitReactions((reaction, reactor) => {
-				return Object.values(enums.confirmationEmojis).includes(reaction.emoji.name) && reactor === user
-			}, {
-				time : CONFIRMATION_TIMEOUT * enums.timeSpans.SECOND,
-				max : 1,
-				errors : ['time']
-			}).then(collected => {
-				let customFunction = common.customFunctions.get(suffix);
-				if (!customFunction.delete()) {
-					let errorEmbed = new Discord.RichEmbed()
-						.setColor(colors.RED)
-						.setTitle('Oops!')
-						.setDescription('Something went wrong when trying to remove that custom function.');
-					msg.channel.send({embed : errorEmbed});
-					return false;
-				}
-				let reactionEmojiName = collected.first().emoji.name;
-				let reactionEmojiBase = reactionEmojiName.substring(0,2);
-				let friendlyDescription = common.PREF_CONFIRMATION_EMOJI_BASE + ' Removed the custom function ' + suffix + '.';
-				let rudeDescription = 'Listen up, kid. You were supposed to react with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' and not '
-					+ reactionEmojiName + '.' + '\n'
-					+ 'I\'ll let that slip this time and removed the custom function ' + suffix + '.';
-				let successEmbed = new Discord.RichEmbed()
-					.setColor(colors.GREEN)
-					.setTitle('Removed custom function!')
-					.setDescription(reactionEmojiBase === common.PREF_CONFIRMATION_EMOJI_BASE ? friendlyDescription : rudeDescription);
-				message.edit({ embed: successEmbed });
-			}).catch(() => {
-				let abortedEmbed = new Discord.RichEmbed()
+		let user = msg.author;
+		let customFunction = common.customFunctions.get(suffix);
+
+		let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => {
+			if (!customFunction.delete()) {
+				let errorEmbed = new Discord.RichEmbed()
 					.setColor(colors.RED)
-					.setTitle('Confirmation timed out!')
-					.setDescription('You did not confirm your action. Process aborted.');
-				message.edit({ embed: abortedEmbed }).then(editedMessage => {
-					editedMessage.delete(5000);
-				});
-			});
+					.setTitle('Oops!')
+					.setDescription('Something went wrong when trying to remove that custom function.');
+				msg.channel.send({embed : errorEmbed});
+				return false;
+			}
+		}, {
+			users : [ user ],
+			initialDesc : 'You are about to remove the custom function ' + suffix + '. Do you want to proceed?',
+			initialTitle : 'Are you sure?',
+			acceptDesc : 'Removed the custom function ' + suffix + '.',
+			acceptTitle : 'Removed custom function!',
+			altAcceptDesc : 'removed the custom function ' + suffix + '.'
 		});
+		confirmationHandler.build();
 	});
 
 let commandCustomExecute = new SubCommand('execute', argumentValues.REQUIRED)

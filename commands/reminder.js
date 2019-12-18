@@ -10,6 +10,8 @@ const Reminder = require('../class/Reminder');
 const ReminderList = require('../class/ReminderList');
 const UserReminderList = require('../class/UserReminderList');
 
+const ConfirmationMessageHandler = require('../class/ConfirmationMessageHandler');
+
 const { argumentValues, colors, permissionLevels, timeSpans, confirmationEmojis } = require('../enum');
 
 let commandReminderAdd = new SubCommand('add', argumentValues.REQUIRED)
@@ -89,43 +91,16 @@ let commandReminderRemoveAll = new SubCommand('all', argumentValues.NONE)
 			msg.channel.send({ embed: embed });
 			return false;
 		}
-		// Timeout for confirmation reaction in seconds
-		const CONFIRMATION_TIMEOUT = 30;
-		let confirmationEmbed = new Discord.RichEmbed()
-			.setColor(colors.PURPLE)
-			.setTitle('Are you sure?')
-			.setDescription('You are about to leave all of your (' + userReminders.size + ') reminders. Is that ' + common.PREF_CONFIRMATION_EMOJI_BASE + '?')
-			.setFooter('React with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
-		msg.channel.send({ embed: confirmationEmbed }).then(message => {
-			message.react(common.PREF_CONFIRMATION_EMOJI_BASE);
-			message.awaitReactions((reaction, reactor) => {
-				return Object.values(confirmationEmojis).includes(reaction.emoji.name) && reactor === user
-			}, {
-				time : CONFIRMATION_TIMEOUT * timeSpans.SECOND,
-				max : 1,
-				errors : ['time']
-			}).then(collected => {
-				common.leaveAllReminders(user);
-				let reactionEmojiName = collected.first().emoji.name;
-				let reactionEmojiBase = reactionEmojiName.substring(0,2);
-				let friendlyDescription = common.PREF_CONFIRMATION_EMOJI_BASE + ' Removed you from all of your reminders.';
-				let rudeDescription = 'Listen up, kid. You were supposed to react with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' and not '
-					+ reactionEmojiName + '. I\'ll let that slip this time and removed you from all of your reminders.';
-				let successEmbed = new Discord.RichEmbed()
-					.setColor(colors.GREEN)
-					.setTitle('Removed from all reminders!')
-					.setDescription(reactionEmojiBase === common.PREF_CONFIRMATION_EMOJI_BASE ? friendlyDescription : rudeDescription);
-				message.edit({ embed: successEmbed });
-			}).catch(() => {
-				let abortedEmbed = new Discord.RichEmbed()
-					.setColor(colors.RED)
-					.setTitle('Confirmation timed out!')
-					.setDescription('You did not confirm your action. Process aborted.');
-				message.edit({ embed: abortedEmbed }).then(editedMessage => {
-					editedMessage.delete(5000);
-				});
-			});
+
+		let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => { common.leaveAllReminders(user) }, {
+			users : [ user ],
+			initialDesc : 'You are about to leave all of your (' + userReminders.size + ') reminders.',
+			initialTitle : 'Are you sure?',
+			acceptDesc : 'Removed you from all of your reminders.',
+			acceptTitle : 'Removed from all reminders!',
+			altAcceptDesc : 'removed you from all of your reminders.'
 		});
+		confirmationHandler.build();
 	});
 
 
@@ -139,14 +114,14 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 			embed.setColor(colors.RED)
 				.setTitle('Not a number!')
 				.setDescription('<#> must be an integer.');
-			msg.channel.send({embed : embed});
+			msg.channel.send({ embed : embed });
 			return false;
 		}
 		if (parseInt(suffix, 10) < 0) {
 			embed.setColor(colors.RED)
 				.setTitle('Below 0!')
 				.setDescription('<#> must be 0 or greater.');
-			msg.channel.send({embed : embed});
+			msg.channel.send({ embed : embed });
 			return false;
 		}
 		let reminderIndex = parseInt(suffix, 10);
@@ -156,58 +131,30 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 			embed.setColor(colors.RED)
 				.setTitle('Not found!')
 				.setDescription('You don\'t have a reminder #' + reminderIndex + '.');
-			msg.channel.send({embed : embed});
+			msg.channel.send({ embed : embed });
 			return false;
 		}
 		reminder = simpleReminders.get(reminderIndex);
 
-		// Timeout for confirmation reaction in seconds
-		const CONFIRMATION_TIMEOUT = 30;
-
 		let reminderString = '#' + reminderIndex + (reminder.task.length > 0 ? ' (' + reminder.task + ')' : '') + ' set for ' + reminder.date;
 
-		let confirmationEmbed = new Discord.RichEmbed()
-			.setColor(colors.PURPLE)
-			.setTitle('Are you sure?')
-			.setDescription('You are about to leave reminder ' + reminderString + '. Is that ' + common.PREF_CONFIRMATION_EMOJI_BASE + '?')
-			.setFooter('React with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' to confirm (' + CONFIRMATION_TIMEOUT + ' seconds)');
-		msg.channel.send({ embed: confirmationEmbed }).then(message => {
-			message.react(common.PREF_CONFIRMATION_EMOJI_BASE);
-			message.awaitReactions((reaction, reactor) => {
-				return Object.values(confirmationEmojis).includes(reaction.emoji.name) && reactor === user
-			}, {
-				time : CONFIRMATION_TIMEOUT * timeSpans.SECOND,
-				max : 1,
-				errors : ['time']
-			}).then(collected => {
-				if (!reminder.removeUser(user)) {
-					embed.setColor(colors.RED)
-						.setTitle('Oops!')
-						.setDescription('Something went wrong when trying to remove that reminder from your list.');
-					msg.channel.send({embed : embed});
-					return false;
-				}
-				let reactionEmojiName = collected.first().emoji.name;
-				let reactionEmojiBase = reactionEmojiName.substring(0,2);
-				let friendlyDescription = common.PREF_CONFIRMATION_EMOJI_BASE + ' Removed you from reminder ' + reminderString + '.';
-				let rudeDescription = 'Listen up, kid. You were supposed to react with ' + common.PREF_CONFIRMATION_EMOJI_BASE + ' and not '
-					+ reactionEmojiName + '.' + '\n'
-					+ 'I\'ll let that slip this time and removed you from reminder ' + reminderString + '.';
-				let successEmbed = new Discord.RichEmbed()
-					.setColor(colors.GREEN)
-					.setTitle('Removed from reminder!')
-					.setDescription(reactionEmojiBase === common.PREF_CONFIRMATION_EMOJI_BASE ? friendlyDescription : rudeDescription);
-				message.edit({ embed: successEmbed });
-			}).catch(() => {
-				let abortedEmbed = new Discord.RichEmbed()
-					.setColor(colors.RED)
-					.setTitle('Confirmation timed out!')
-					.setDescription('You did not confirm your action. Process aborted.');
-				message.edit({ embed: abortedEmbed }).then(editedMessage => {
-					editedMessage.delete(5000);
-				});
-			});
+		let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => {
+			if (!reminder.removeUser(user)) {
+				embed.setColor(colors.RED)
+					.setTitle('Oops!')
+					.setDescription('Something went wrong when trying to remove that reminder from your list.');
+				msg.channel.send({ embed : embed });
+				return false;
+			}
+		}, {
+			users : [ user ],
+			initialDesc : 'You are about to leave reminder ' + reminderString + '.',
+			initialTitle : 'Are you sure?',
+			acceptDesc : 'Removed you from reminder ' + reminderString + '.',
+			acceptTitle : 'Removed from reminder!',
+			altAcceptDesc : 'removed you from reminder ' + reminderString + '.'
 		});
+		confirmationHandler.build();
 	});
 
 
@@ -215,14 +162,14 @@ let commandReminderList = new SubCommand('list', argumentValues.NONE)
 	.addDoc('', 'List all of your reminders.')
 	.setExecute(async msg => {
 		let user = msg.author;
-		let reminderList = new UserReminderList(msg, user);
+		let reminderList = new UserReminderList(msg.channel, user, user);
 		await reminderList.build(msg.channel);
 	});
 
 let commandReminderDisplayAll = new SubCommand('all', argumentValues.NONE)
 	.addDoc('', 'Display all reminders of all users.')
 	.setExecute(async msg => {
-		let reminderList = new ReminderList(msg, common.reminders);
+		let reminderList = new ReminderList(msg.channel, common.reminders);
 		await reminderList.build(await msg.author.getDmChannel());
 	});
 
@@ -236,15 +183,14 @@ let commandReminderDisplay = new SubCommand('display', argumentValues.REQUIRED, 
 		if (users.has(suffix)) user = users.get(suffix);
 		else if (mentions.users.size > 0) user = msg.mentions.users.first();
 		else throw 'WRONG';
-		let reminderList = new UserReminderList(msg, user);
+		let reminderList = new UserReminderList(msg.channel, user, msg.author);
 		await reminderList.build(await msg.author.getDmChannel());
 	});
 
-let commandReminder =
-	new Command('reminder', argumentValues.NULL)
-		.addSub(commandReminderAdd)
-		.addSub(commandReminderRemove)
-		.addSub(commandReminderList)
-		.addSub(commandReminderDisplay);
+let commandReminder = new Command('reminder', argumentValues.NULL)
+	.addSub(commandReminderAdd)
+	.addSub(commandReminderRemove)
+	.addSub(commandReminderList)
+	.addSub(commandReminderDisplay);
 
 module.exports = commandReminder;
