@@ -1,26 +1,26 @@
 // ALL ENUMS
-module.exports.argumentValues = require('../enum/ArgumentValueEnum');
+module.exports.argumentValues = require('./ArgumentValueEnum');
 
-module.exports.confirmationEmojis = require('../enum/ConfirmationEmojiEnum');
+module.exports.confirmationEmojis = require('./ConfirmationEmojiEnum');
 
-module.exports.dumpTypes = require('../enum/DumpTypeEnum');
+module.exports.dumpTypes = require('./DumpTypeEnum');
 
-module.exports.colors = require('../enum/EmbedColorEnum');
+module.exports.colors = require('./EmbedColorEnum');
 
-module.exports.emojiNums = require('../enum/EmojiNumEnum');
+module.exports.emojiNums = require('./EmojiNumEnum');
 
-module.exports.gameTypes = require('../enum/GameTypeEnum');
+module.exports.gameTypes = require('./GameTypeEnum');
 
-module.exports.months = require('../enum/MonthEnum');
+module.exports.months = require('./MonthEnum');
 
-module.exports.permissionLevels = require('../enum/PermissionLevelEnum');
+module.exports.permissionLevels = require('./PermissionLevelEnum');
 
-module.exports.reactionEvents = require('../enum/ReactionEventEnum');
+module.exports.reactionEvents = require('./ReactionEventEnum');
 
-module.exports.roleNames = require('../enum/RoleNameEnum');
+module.exports.roleNames = require('./RoleNameEnum');
 
-module.exports.serverFeatures = require('../enum/ServerFeatureEnum');
+module.exports.serverFeatures = require('./ServerFeatureEnum');
 
-module.exports.timeSpans = require('../enum/TimeSpanEnum');
+module.exports.timeSpans = require('./TimeSpanEnum');
 
-module.exports.weekDays = require('../enum/WeekDayEnum');
+module.exports.weekDays = require('./WeekDayEnum');
