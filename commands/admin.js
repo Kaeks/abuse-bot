@@ -56,9 +56,21 @@ let commandAdminDump = new SubCommand('dump', argumentValues.NULL)
 	.addSub(commandAdminDumpServer)
 	.addSub(commandAdminDumpAll);
 
+let commandAdminEditedView = new SubCommand('view', argumentValues.OPTIONAL)
+	.addDoc('[amount]', 'View saved edited messages.')
+	.setExecute((msg, suffix) => {
+		let index = suffix ? suffix - 1 : 0;
+		let editedHandler = new EditedMessageHandler(msg.channel, common.Edited, index);
+		editedHandler.build();
+	});
+
+let commandAdminEdited = new SubCommand('edited', argumentValues.NULL)
+	.addSub(commandAdminEditedView);
+
 let commandAdmin = new Command('admin', argumentValues.NULL, permissionLevels.SERVER_SUPERUSER)
 	.addSub(commandAdminClean)
-	.addSub(commandAdminDump);
+	.addSub(commandAdminDump)
+	.addSub(commandAdminEdited);
 
 module.exports = commandAdmin;
 
