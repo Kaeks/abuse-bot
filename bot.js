@@ -4,6 +4,8 @@ const CronJob = require('cron').CronJob;
 const Discord = require('discord.js');
 const client = new Discord.Client();
 const chrono = require('chrono-node');
+const Database = require('better-sqlite3');
+const db = new Database('./storage/wiktor.db', {});
 
 const enums = require('./enum');
 const { argumentValues, colors, reactionEvents, permissionLevels, roleNames } = enums;
@@ -22,6 +24,9 @@ const {
 	updatePresence,
 	sendWednesday
 } = common;
+
+const dbImport = fs.readFileSync('./wiktor.sql', 'utf8');
+db.exec(dbImport);
 
 // Catch UnhandledPromiseRejection
 process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection', error));
