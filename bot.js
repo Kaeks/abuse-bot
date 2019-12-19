@@ -5,11 +5,8 @@ const Discord = require('discord.js');
 const client = new Discord.Client();
 const chrono = require('chrono-node');
 
-const argumentValues = require('./enum/ArgumentValueEnum');
-const colors = require('./enum/EmbedColorEnum');
-const reactionEvents = require('./enum/ReactionEventEnum');
-const permissionLevels = require('./enum/PermissionLevelEnum');
-const roleNames = require('./enum/RoleNameEnum');
+const enums = require('./enum');
+const { argumentValues, colors, reactionEvents, permissionLevels, roleNames } = enums;
 
 /// EXPORTS
 module.exports = {
@@ -60,6 +57,7 @@ let badWordsRegExp = new RegExp('(?<=^|' + specialChars + ')(' + joinedBadWords 
 //// EVENTS
 // START
 client.on('ready', async () => {
+	// Initial "Hello world!"
 	console.log('*hacker voice* I\'m in.');
 	console.log(`Agent ${client.user.username} signing in.`);
 	updatePresence();
@@ -67,6 +65,7 @@ client.on('ready', async () => {
 	let now = new Date();
 	common.log(now.toString());
 
+	// Data
 	for (const guildEntry of client.guilds) {
 		let guild = guildEntry[1];
 		await setUpServer(guild);
@@ -98,7 +97,6 @@ client.on('messageDelete', message => {
 	common.log('Message by ' + message.author + ' deleted.');
 	let shortened = {
 		id: message.id,
-		type: message.type,
 		content: message.content,
 		author: {
 			id: message.author.id,
