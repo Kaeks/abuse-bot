@@ -2,7 +2,7 @@
 
 ## Setup
 
-Requires node.js
+Requires [node.js](https://nodejs.org/) and [better-sqlite3](https://www.npmjs.com/package/better-sqlite3)
 
 Written using [discord.js](https://discord.js.org). I will try to keep this bot up to date with the latest updates of discord.js.
 
@@ -10,7 +10,9 @@ Written using [discord.js](https://discord.js.org). I will try to keep this bot 
 
 1. Install [discord.js](https://discord.js.org) and its dependencies inside your bot's root directory using `npm install discord.js`.
 
-2. Create `config.json` in the bot's root directory and fill it with the following data, replacing the data in angle brackets with your configuration.
+2. Follow the installation for [better-sqlite3](https://www.npmjs.com/package/better-sqlite3). Usually, `npm install --save better-sqlite3` should work just fine.
+
+3. Create `config.json` in the bot's root directory and fill it with the following data, replacing the data in angle brackets with your configuration.
 
 ```
 {
@@ -20,7 +22,7 @@ Written using [discord.js](https://discord.js.org). I will try to keep this bot 
 }
 ```
 
-3. Run bot.js through `node bot.js`.
+4. Run bot.js through `node bot.js`.
 
 ## Privacy Disclaimer
 
