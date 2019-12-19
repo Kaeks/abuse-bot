@@ -355,7 +355,7 @@ function handleMessage(msg) {
 			msg.channel.send("@everyone? Really? @everyone? Why would you ping @everyone, " + msg.author + "?");
 			return;
 		}
-		let saidBadWord = Config.badWordFilter === true && msg.content.match(badWordsRegExp);
+		let saidBadWord = msg.content.match(badWordsRegExp);
 		if (msg.isMentioned(client.user) || msg.channel.type === 'dm') {
 			if (ummah) {
 				if (eatAss) {
@@ -373,7 +373,7 @@ function handleMessage(msg) {
 		} else {
 			if (eatAss) {
 				msg.channel.send('Hey, ' + msg.author + ', that\'s not very nice of you!');
-			} else if (saidBadWord) {
+			} else if (Config.badWordFilter === true && saidBadWord) {
 				msg.channel.send('Whoa there buddy. Mind your language, ' + msg.author + ', there\'s kids around!')
 			}
 		}
