@@ -1,93 +1,175 @@
-/*
-  ℹ SQL file for the initial setup of the database
- */
-
-/* USERS */
-CREATE TABLE IF NOT EXISTS users
+create table if not exists channels
 (
-    id integer constraint users_pk primary key
-);
-CREATE UNIQUE INDEX users_id_uindex on users (id);
-
-/* SERVERS */
-CREATE TABLE IF NOT EXISTS servers
-(
-    id integer constraint servers_pk primary key
-);
-CREATE UNIQUE INDEX servers_id_uindex on servers (id);
-
-/* WATER TIMERS */
-CREATE TABLE IF NOT EXISTS water_timers
-(
-	id integer constraint water_timers_pk primary key autoincrement,
-	userId integer constraint water_timers_users_id_fk references users
-);
-CREATE UNIQUE INDEX waterTimers_id_uindex on water_timers (id);
-
-/* SERVER ADMINS */
-CREATE TABLE IF NOT EXISTS server_admins
-(
-    userId integer constraint serverAdmins_users_id_fk references users,
-    serverId integer constraint serverAdmins_servers_id_fk references servers
+    id   integer
+        constraint channels_pk
+            primary key,
+    type text
 );
 
-/* REMINDERS */
-CREATE TABLE IF NOT EXISTS reminders
+create unique index if not exists channels_id_uindex
+    on channels (id);
+
+create table if not exists reminders
 (
-    id integer constraint reminders_pk primary key autoincrement,
+    id            integer
+        constraint reminders_pk
+            primary key autoincrement,
     userMessageId integer,
-    botMessageId integer,
-    date text,
-    task text
-);
-CREATE UNIQUE INDEX reminders_id_uindex on reminders (id);
-
-/* USER X REMINDER CROSS TABLE */
-CREATE TABLE IF NOT EXISTS user_reminder_relations
-(
-	userId integer constraint user_reminder_relations_users_id_fk references users,
-	reminderId integer constraint user_reminder_relations_reminders_id_fk references reminders
+    botMessageId  integer,
+    date          text,
+    task          text
 );
 
-/* CHANNELS */
-CREATE TABLE IF NOT EXISTS channels
-(
-	id integer constraint channels_pk primary key,
-	name text,
-	serverId integer constraint channels_servers_id_fk references servers
-);
-CREATE UNIQUE INDEX channels_id_uindex on channels (id);
+create unique index if not exists reminders_id_uindex
+    on reminders (id);
 
-/* DELETED MESSAGES */
-CREATE TABLE IF NOT EXISTS deleted_messages
+create table if not exists users
 (
-	id integer constraint deleted_messages_pk primary key,
-	content text,
-	authorId integer references users,
-	channelId integer constraint deleted_messages_channels_id_fk references channels
+    id            integer
+        constraint users_pk
+            primary key,
+    wednesday     integer default 0,
+    name          text,
+    discriminator integer,
+    hasInteracted integer default 0
 );
-CREATE UNIQUE INDEX deleted_messages_id_uindex on deleted_messages (id);
 
-/* EDITED MESSAGES */
-CREATE TABLE IF NOT EXISTS edited_messages
+create table if not exists dm_channels
 (
-	messageId integer,
-	oldContent text,
-	newContent text,
-	authorId integer references users,
-	channelId integer references channels,
-	id integer constraint edited_messages_pk primary key autoincrement
+    id          integer
+        constraint dm_channels_pk
+            primary key
+        references channels,
+    recipientId integer
+        references users
 );
-CREATE UNIQUE INDEX edited_messages_id_uindex on edited_messages (id);
 
-/* WEDNESDAYS */
-CREATE TABLE IF NOT EXISTS wednesdays
+create unique index if not exists dm_channels_id_uindex
+    on dm_channels (id);
+
+create table if not exists messages
 (
-	serverId integer references servers,
-	channelId integer references channels,
-	enabled integer,
-	userId integer constraint wednesdays_users_id_fk references users
+    id             integer
+        constraint messages_pk
+            primary key,
+    authorId       integer
+        references users,
+    channelId      integer
+        references channels,
+    deleted        integer default 0,
+    deletedContent text
 );
-CREATE UNIQUE INDEX wednesdays_channelId_uindex on wednesdays (channelId);
-CREATE UNIQUE INDEX wednesdays_serverId_uindex on wednesdays (serverId);
-CREATE UNIQUE INDEX wednesdays_userId_uindex on wednesdays (userId);
+
+create table if not exists message_attachments
+(
+    id        integer
+        constraint message_attachments_pk
+            primary key autoincrement,
+    messageId integer
+        references messages,
+    filename  text,
+    filesize  integer,
+    url       text,
+    proxyURL  text
+);
+
+create unique index if not exists message_attachments_id_uindex
+    on message_attachments (id);
+
+create table if not exists message_edits
+(
+    id         integer
+        constraint message_edits_pk
+            primary key autoincrement,
+    messageId  integer
+        references messages,
+    oldContent text,
+    newContent text,
+    date       text
+);
+
+create unique index if not exists message_edits_id_uindex
+    on message_edits (id);
+
+create table if not exists message_embeds
+(
+    id        integer
+        constraint message_embeds_pk
+            primary key autoincrement,
+    messageId integer
+        references messages,
+    data      text
+);
+
+create unique index if not exists message_embeds_id_uindex
+    on message_embeds (id);
+
+create unique index if not exists messages_id_uindex
+    on messages (id);
+
+create table if not exists servers
+(
+    id                 integer
+        constraint servers_pk
+            primary key,
+    ownerId            integer
+        references users,
+    wednesday          integer default 0,
+    wednesdayChannelId integer,
+    name               text
+);
+
+create table if not exists server_admins
+(
+    userId   integer
+        references users,
+    serverId integer
+        references servers
+);
+
+create unique index if not exists server_admins_uindex
+    on server_admins (userId, serverId);
+
+create unique index if not exists servers_id_uindex
+    on servers (id);
+
+create table if not exists text_channels
+(
+    id       integer
+        constraint text_channels_pk
+            primary key,
+    serverId integer
+        references servers,
+    name     text
+);
+
+create unique index if not exists text_channels_id_uindex
+    on text_channels (id);
+
+create table if not exists user_reminder_relations
+(
+    userId     integer
+        references users,
+    reminderId integer
+        references reminders
+);
+
+create unique index if not exists users_id_uindex
+    on users (id);
+
+create table if not exists water_timers
+(
+    id       integer
+        constraint water_timers_pk
+            primary key autoincrement,
+    userId   integer
+        references users,
+    interval integer default 60,
+    lastDate text,
+    nextDate text,
+    missed   integer default 0
+);
+
+create unique index if not exists water_timers_id_uindex
+    on water_timers (id);
+

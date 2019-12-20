@@ -1,5 +1,4 @@
-const fs = require('fs');
-const { Discord, chrono, client } = require('./bot');
+const { Discord, chrono, client, fs } = require('./bot');
 
 //// AMENDS
 Number.prototype.pad = function(size) {

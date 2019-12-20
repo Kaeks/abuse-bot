@@ -4,29 +4,35 @@ const CronJob = require('cron').CronJob;
 const Discord = require('discord.js');
 const client = new Discord.Client();
 const chrono = require('chrono-node');
+const fs = require('fs');
+
 const Database = require('better-sqlite3');
+const {DatabaseHandler} = require('./class');
 const db = new Database('./storage/wiktor.db', {});
+
+const dbImport = fs.readFileSync('./wiktor.sql', 'utf8');
+client.db.exec(dbImport);
+client.db.pragma('synchronous = 1');
+client.db.pragma('journal_mode = wal');
+
+client.dbHandler = new DatabaseHandler(db);
 
 const enums = require('./enum');
 const { argumentValues, colors, reactionEvents, permissionLevels, roleNames } = enums;
 
 /// EXPORTS
 module.exports = {
-	Discord, chrono, client
+	Discord, chrono, client, fs
 };
 
 // IMPORTS
 const common = require('./common');
 const {
-	fs,
 	Config, Storage, Blocked, Deleted, Edited,
 	saveData, saveBlocked, saveDeleted, saveEdited,
 	updatePresence,
 	sendWednesday
 } = common;
-
-const dbImport = fs.readFileSync('./wiktor.sql', 'utf8');
-db.exec(dbImport);
 
 // Catch UnhandledPromiseRejection
 process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection', error));
@@ -71,6 +77,9 @@ client.on('ready', async () => {
 	common.log(now.toString());
 
 	// Data
+	client.users.forEach(user => setUpUserDb(user));
+	client.guilds.forEach(guild => setUpServerDb(guild));
+
 	for (const guildEntry of client.guilds) {
 		let guild = guildEntry[1];
 		await setUpServer(guild);
@@ -140,6 +149,10 @@ client.on('messageUpdate', (oldMessage, newMessage) => {
 		// discard messages created by bots
 		return false;
 	}
+	if (oldMessage.content === newMessage.content) {
+		// ignore messages where the content didn't change, e.g.: embed loads
+		return false;
+	}
 	common.log('Message by ' + oldMessage.author + ' edited.');
 	let combinedEntry = {
 		id: oldMessage.id,
@@ -191,6 +204,13 @@ client.on('guildCreate', async guild => {
 	await setUpServer(guild);
 });
 
+// SERVER UPDATED
+client.on('guildUpdate', (oldGuild, newGuild) => {
+	if (oldGuild.name !== newGuild.name || oldGuild.owner !== newGuild.owner) {
+		setUpServerDb(newGuild);
+	}
+});
+
 // REMOVED FROM SERVER
 client.on('guildDelete', guild => {
 	common.log('Whoa whoa whoa I just got kicked from ' + guild.name);
@@ -198,7 +218,7 @@ client.on('guildDelete', guild => {
 
 //// CRON
 // WEDNESDAY
-let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
+new CronJob('0 0 * * 3', async function() {
 	for (let serverEntry in Storage.servers) {
 		if (!Storage.servers.hasOwnProperty(serverEntry)) continue;
 		let cur = Storage.servers[serverEntry];

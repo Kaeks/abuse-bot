@@ -14,3 +14,5 @@ module.exports.CustomFunction = require('./CustomFunction');
 module.exports.MessageHandler = require('./MessageHandler');
 module.exports.EditedMessageHandler = require('./EditedMessageHandler');
 module.exports.ConfirmationMessageHandler = require('./ConfirmationMessageHandler');
+
+module.exports.DatabaseHandler = require('./DatabaseHandler');
