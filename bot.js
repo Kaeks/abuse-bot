@@ -31,9 +31,16 @@ process.on('uncaughtException', async error => {
 	console.error('Uncaught Exception', error);
 	let errorEmbed = new Discord.RichEmbed()
 		.setColor(colors.RED)
-		.setTitle('Fatal uncaught exception!')
-		.setDescription(error);
+		.setTitle('Fatal uncaught exception!');
 	await common.getOwner().sendDm({ embed: errorEmbed });
+
+	const errArr = error.message.match(/.{1,2048}/g);
+	for (let chunk of errArr) {
+		let errorChunkEmbed = new Discord.RichEmbed()
+			.setColor(colors.RED)
+			.setDescription(chunk);
+		await common.getOwner().sendDm({ embed : errorChunkEmbed });
+	}
 	process.exit(1);
 });
 
@@ -338,42 +345,43 @@ function setUpUser(msg, user) {
  * @param msg
  */
 function handleMessage(msg) {
-	if (msg.author.id === client.user.id) return;
+	if (msg.author === common.getOwner() && msg.content === 'wiktor pls crash') return {}.a.b;
+	if (msg.author === client.user) return;
 	if (isCommand(msg)) {
 		let executedCommand = handleCommand(msg);
 		if (msg.channel.type === 'dm' || msg.channel.type === 'group') return;
 		if (msg.guild.me.permissions.has('MANAGE_MESSAGES') && (executedCommand === null || executedCommand.delete === true)) {
 				msg.delete(5000);
 		}
-	} else {
-		// Message is not a command, handle non-command interactions
-		let eatAss = msg.content.match(/(?:^|[\s])((eat\sass)|(eat\s.*\sass))(?=\s|$)/i);
-		let ummah = msg.content.match(/u((mah+)|(m{2,}ah*))/i);
-		if (msg.mentions.everyone) {
-			msg.channel.send("@everyone? Really? @everyone? Why would you ping @everyone, " + msg.author + "?");
-			return;
-		}
-		let saidBadWord = msg.content.match(badWordsRegExp);
-		if (msg.isMentioned(client.user) || msg.channel.type === 'dm') {
-			if (ummah) {
-				if (eatAss) {
-					msg.channel.send('Gladly, ' + msg.author + ' UwU');
-				} else {
-					msg.channel.send(msg.author + ' :kiss:');
-				}
-			} else if (eatAss) {
-				msg.channel.send('Hey, ' + msg.author + ', how about you eat mine?');
-			} else if (saidBadWord) {
-				msg.channel.send('No u, ' + msg.author + '.');
-			} else if (msg.isMentioned(client.user)) {
-				msg.channel.send('wassup ' + msg.author);
-			}
-		} else {
+		return;
+	}
+	// Message is not a command, handle non-command interactions
+	let eatAss = msg.content.match(/(?:^|[\s])((eat\sass)|(eat\s.*\sass))(?=\s|$)/i);
+	let ummah = msg.content.match(/u((mah+)|(m{2,}ah*))/i);
+	if (msg.mentions.everyone) {
+		msg.channel.send("@everyone? Really? @everyone? Why would you ping @everyone, " + msg.author + "?");
+		return;
+	}
+	let saidBadWord = msg.content.match(badWordsRegExp);
+	if (msg.isMentioned(client.user) || msg.channel.type === 'dm') {
+		if (ummah) {
 			if (eatAss) {
-				msg.channel.send('Hey, ' + msg.author + ', that\'s not very nice of you!');
-			} else if (Config.badWordFilter === true && saidBadWord) {
-				msg.channel.send('Whoa there buddy. Mind your language, ' + msg.author + ', there\'s kids around!')
+				msg.channel.send('Gladly, ' + msg.author + ' UwU');
+			} else {
+				msg.channel.send(msg.author + ' :kiss:');
 			}
+		} else if (eatAss) {
+			msg.channel.send('Hey, ' + msg.author + ', how about you eat mine?');
+		} else if (saidBadWord) {
+			msg.channel.send('No u, ' + msg.author + '.');
+		} else if (msg.isMentioned(client.user)) {
+			msg.channel.send('wassup ' + msg.author);
+		}
+	} else {
+		if (eatAss) {
+			msg.channel.send('Hey, ' + msg.author + ', that\'s not very nice of you!');
+		} else if (Config.badWordFilter === true && saidBadWord) {
+			msg.channel.send('Whoa there buddy. Mind your language, ' + msg.author + ', there\'s kids around!')
 		}
 	}
 }
