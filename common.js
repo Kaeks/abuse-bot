@@ -199,7 +199,8 @@ if (Config.devMode === true && Config.devToken === null) {
 
 if (!canRunBot) process.exit(1);
 
-const STORAGE_PATH = Config.devMode ? './storage/dev/' : './storage/';
+//const STORAGE_PATH = Config.devMode ? './storage/dev/' : './storage/';
+const STORAGE_PATH = './storage/';
 
 // STORAGE FILE PATHS
 const DATA_PATH			= STORAGE_PATH + 'data.json';

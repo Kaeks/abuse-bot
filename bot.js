@@ -34,7 +34,10 @@ process.on('uncaughtException', async error => {
 		.setTitle('Fatal uncaught exception!');
 	await common.getOwner().sendDm({ embed: errorEmbed });
 
+	//TODO fix code that should split the error message into send-able bits, disabled due to unexpected behavior
+	/*
 	const errArr = error.message.match(/.{1,2048}/g);
+	console.log(errArr);
 	for (let chunk of errArr) {
 		let errorChunkEmbed = new Discord.RichEmbed()
 			.setColor(colors.RED)
@@ -42,6 +45,7 @@ process.on('uncaughtException', async error => {
 		await common.getOwner().sendDm({ embed : errorChunkEmbed });
 	}
 	process.exit(1);
+	*/
 });
 
 const COMMAND_DIRECTORY = './commands';
@@ -345,7 +349,7 @@ function setUpUser(msg, user) {
  * @param msg
  */
 function handleMessage(msg) {
-	if (msg.author === common.getOwner() && msg.content === 'wiktor pls crash') return {}.a.b;
+	if (msg.author === common.getOwner() && msg.content === 'wiktor pls crash') throw JSON.stringify({a:0,b:1,c:2});
 	if (msg.author === client.user) return;
 	if (isCommand(msg)) {
 		let executedCommand = handleCommand(msg);
