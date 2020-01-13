@@ -26,28 +26,6 @@ const {
 // Catch UnhandledPromiseRejection
 process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection', error));
 
-// Catch fatal errors and send a message to the bot owner before exiting
-process.on('uncaughtException', async error => {
-	console.error('Uncaught Exception', error);
-	let errorEmbed = new Discord.RichEmbed()
-		.setColor(colors.RED)
-		.setTitle('Fatal uncaught exception!');
-	await common.getOwner().sendDm({ embed: errorEmbed });
-
-	//TODO fix code that should split the error message into send-able bits, disabled due to unexpected behavior
-	/*
-	const errArr = error.message.match(/.{1,2048}/g);
-	console.log(errArr);
-	for (let chunk of errArr) {
-		let errorChunkEmbed = new Discord.RichEmbed()
-			.setColor(colors.RED)
-			.setDescription(chunk);
-		await common.getOwner().sendDm({ embed : errorChunkEmbed });
-	}
-	process.exit(1);
-	*/
-});
-
 const COMMAND_DIRECTORY = './commands';
 
 client.commands = new Discord.Collection();
