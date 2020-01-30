@@ -18,3 +18,4 @@ commands/dev.js
 #ide
 *.iml
 .idea/
+.vscode/
