@@ -1,5 +1,4 @@
-const common = require('../common');
-const { Discord } = common;
+const Discord = require.main.require('./discordjs_amends');
 
 const DocumentationEntry = require('./DocumentationEntry');
 

@@ -1,16 +1,15 @@
-const common = require('../common');
-const { Discord } = common;
+const Discord = require.main.require('./discordjs_amends');
 
-const enums = require('../enum');
+const enums = require.main.require('./enum');
+const { colors, emojiNums } = enums;
 
-const { reactionEvents, colors, emojiNums } = enums;
-
-const MessageHandler = require('./MessageHandler');
+const MessageHandler = require.main.require('./class/handlers/MessageHandler');
 
 // ms
 const LISTENING_TIME = 30 * 60 * 1000;
 
-class ReminderList extends MessageHandler {
+class ReminderListHandler extends MessageHandler {
+	
 	reminders;
 	page;
 	pages;
@@ -21,8 +20,8 @@ class ReminderList extends MessageHandler {
 	EMOJI_PREV = '◀';
 	EMOJI_NEXT = '▶';
 
-	constructor(channel, collection, page = 0) {
-		super(channel);
+	constructor(client, channel, collection, page = 0) {
+		super(client, channel);
 		this.reminders = collection;
 		this.page = page;
 		this.pages = Math.ceil(collection.size / this.ITEM_LIMIT);
@@ -45,13 +44,13 @@ class ReminderList extends MessageHandler {
 	resetExpireTimer() {
 		this.stopExpireTimer();
 		this.startExpireTimer();
-		common.debug('Reset reminder list expire timer with id ' + this.id + '.');
+		this.client.logger.debug('Reset reminder list expire timer with id ' + this.id + '.');
 	}
 
 	delete() {
 		this.stopExpireTimer();
 		this.message.delete().catch(console.error);
-		common.debug('Deleted reminder list with id ' + this.id + '.');
+		this.client.logger.debug('Deleted reminder list with id ' + this.id + '.');
 	}
 
 	getReminderOfCurList(num) {
@@ -148,7 +147,7 @@ class ReminderList extends MessageHandler {
 				}
 			}
 
-			common.addReactionListener(message, messageReaction => {
+			this.client.reactionListenerHandler.add(message, messageReaction => {
 				this.resetExpireTimer();
 				if (messageReaction.emoji.name === this.EMOJI_PREV) {
 					this.goPrevPage();
@@ -157,7 +156,7 @@ class ReminderList extends MessageHandler {
 				}
 			}, [ this.EMOJI_PREV, this.EMOJI_NEXT ]);
 
-			common.addReactionListener(message, (messageReaction, user) => {
+			this.client.reactionListenerHandler.add(message, (messageReaction, user) => {
 				this.resetExpireTimer();
 				let index = Object.values(emojiNums).indexOf(messageReaction.emoji.name);
 				let reminder = this.getReminderOfCurList(index);
@@ -179,4 +178,4 @@ class ReminderList extends MessageHandler {
 
 }
 
-module.exports = ReminderList;
+module.exports = ReminderListHandler;

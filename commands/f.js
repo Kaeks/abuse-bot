@@ -1,19 +1,20 @@
-const common = require('../common');
-const { Discord } = common;
+const Discord = require.main.require('./discordjs_amends');
 
-const Command = require('../class/Command');
+const classes = require.main.require('./class');
+const { Command } = classes;
 
-const argumentValues = require('../enum/ArgumentValueEnum');
-const colors = require('../enum/EmbedColorEnum');
+const enums = require.main.require('./enum');
+const { argumentValues, colors } = enums;
 
 let commandF = new Command('f', argumentValues.NONE)
 	.addDoc('', 'Pay respects.')
 	.setExecute(msg => {
+		let author = msg.author;
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.GREEN)
-			.setAuthor(msg.author.username, msg.author.displayAvatarURL)
+			.setAuthor(author.username, author.displayAvatarURL)
 			.setImage('https://cdn.discordapp.com/attachments/269556649952280576/517073107891126292/image0.jpg')
-			.setFooter(msg.author.username + ' pays their respects.');
+			.setFooter(author.username + ' pays their respects.');
 		msg.channel.send({ embed: embed });
 	});
 

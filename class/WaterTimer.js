@@ -1,7 +1,8 @@
-const common = require('../common');
-const { Discord, Storage } = common;
+const Discord = require.main.require('./discordjs_amends');
+const util = require.main.require('./util');
 
-const colors = require('../enum/EmbedColorEnum');
+const enums = require.main.require('./enum');
+const { colors } = enums;
 
 const MINUTE_MULTIPLIER = 60 * 1000;
 
@@ -58,7 +59,7 @@ class WaterTimer {
 				'**(' + missedIntervals + ')** time' + (missedIntervals !== 1 ? 's' : '') + '.'
 			);
 		await this.user.sendDm({ embed: embed});
-		common.log('Sent apology for ' + missedIntervals + ' missed reminders to ' + this.user);
+		client.logger.log('Sent apology for ' + missedIntervals + ' missed reminders to ' + this.user);
 		return true;
 	}
 
@@ -67,9 +68,10 @@ class WaterTimer {
 	 * @returns {Promise<boolean>}
 	 */
 	async send() {
-		if (this.user.presence.status === 'offline' || (this.user.presence.status === 'dnd' && Storage.users[this.user.id].water.ignoreDnd !== true)) {
+		let client = this.user.client;
+		if (this.user.presence.status === 'offline' || (this.user.presence.status === 'dnd' && client.data.users[this.user.id].water.ignoreDnd !== true)) {
 			this.missed++;
-			common.debug('User ' + this.user + ' missed water reminder. Now at ' + this.missed + '.');
+			client.logger.debug('User ' + this.user + ' missed water reminder. Now at ' + this.missed + '.');
 			return false;
 		}
 		let embed = new Discord.RichEmbed()
@@ -83,73 +85,24 @@ class WaterTimer {
 		await this.user.sendDm({ embed: embed});
 		this.lastDate = new Date();
 		this.missed = 0;
-		common.debug('Sent water reminder to ' + this.user + '.');
+		client.logger.debug('Sent water reminder to ' + this.user + '.');
 		return true;
 	}
 
 	trigger() {
 		this.nextDate = new Date(new Date().valueOf() + this.interval * MINUTE_MULTIPLIER);
 		this.send().catch(console.error);
-		common.saveWaterTimers();
-	}
-
-	/**
-	 * Starts the water timer
-	 */
-	start() {
-		if (common.runningWaterTimers.has(this.user.id)) {
-			throw 'Attempted to start already running water timer of user ' + this.user + '.';
-		}
-		let me = this;
-		let now = new Date();
-		let timer = setTimeout(function() {
-			me.trigger();
-			let subsequentInterval = setInterval(() => {
-				me.trigger()
-			}, me.interval * MINUTE_MULTIPLIER);
-			common.runningWaterTimers.set(me.user.id, subsequentInterval)
-		}, this.nextDate - now);
-
-		common.runningWaterTimers.set(this.user.id, timer);
-
-		common.debug('Started water timer for ' + this.user + '.');
-	}
-
-	/**
-	 * Stops the water timer
-	 * @returns {boolean}
-	 */
-	stop() {
-		if (!common.runningWaterTimers.has(this.user.id)) {
-			common.info('Water timer of user ' + this.user + ' was not running.');
-			return false;
-		}
-		let timerEntry = common.runningWaterTimers.get(this.user.id);
-		clearInterval(timerEntry);
-		common.runningWaterTimers.delete(this.user.id);
-		common.debug('Stopped water timer of user ' + this.user + '.');
-		return true;
 	}
 
 	/**
 	 * Sets a new interval
+	 * @param {number} newInterval
 	 */
 	updateInterval(newInterval) {
 		let oldInterval = this.interval;
 		this.interval = newInterval;
 		let started = new Date(this.nextDate - oldInterval * MINUTE_MULTIPLIER);
 		this.nextDate = new Date(started.valueOf() + newInterval * MINUTE_MULTIPLIER);
-		common.saveWaterTimers();
-		this.update();
-		common.debug('Updated interval of water timer of user ' + this.user + ' to ' + newInterval + '.');
-	}
-
-	/**
-	 * Updates the cached water timer
-	 */
-	update() {
-		this.stop();
-		this.start();
 	}
 
 	/**

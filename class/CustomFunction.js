@@ -1,5 +1,5 @@
-const common = require('../common');
-const enums = require('../enum');
+const Discord = require.main.require('./discordjs_amends');
+const enums = require.main.require('./enum');
 
 class CustomFunction {
 	name;
@@ -16,15 +16,8 @@ class CustomFunction {
 		this.executions = executions
 	}
 
-	delete() {
-		if (!common.customFunctions.delete(this.name)) throw 'Custom function with name \'' + this.name + '\' could not be removed from collection.';
-		common.saveCustomFunctions();
-		return true;
-	}
-
 	async execute(msg) {
 		this.executions++;
-		common.saveCustomFunctions();
 		return eval(this.fn);
 	}
 }

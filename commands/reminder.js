@@ -1,35 +1,45 @@
-const common = require('../common');
+const Discord = require.main.require('./discordjs_amends');
+const chrono = require('chrono-node');
+
+const classes = require.main.require('./class');
 const {
-	Discord, chrono
-} = common;
+	Command, SubCommand, Reminder, handlers
+} = classes;
 
-const Command = require('../class/Command.js');
-const SubCommand = require('../class/SubCommand.js');
+const { ReminderListHandler, UserReminderListHandler, ConfirmationMessageHandler } = handlers;
 
-const Reminder = require('../class/Reminder');
-const ReminderList = require('../class/ReminderList');
-const UserReminderList = require('../class/UserReminderList');
+const enums = require.main.require('./enum');
+const { argumentValues, colors, permissionLevels } = enums;
 
-const ConfirmationMessageHandler = require('../class/ConfirmationMessageHandler');
-
-const { argumentValues, colors, permissionLevels, timeSpans, confirmationEmojis } = require('../enum');
+const REMINDER_SIGNUP_EMOJI = '🙋';
 
 let commandReminderAdd = new SubCommand('add', argumentValues.REQUIRED)
 	.addDoc(
-		'<time/date> [-m <message]',
+		'<time|date> [-m <message>]',
 		'Add a reminder that will remind you until either <time> has passed or remind you on <date>. Optional message after token [-m].'
 	).setDelete(false)
 	.setExecute((msg, suffix) => {
+		let client = msg.client;
+		let channel = msg.channel;
+		let reminderHandler = client.reminderHandler;
+
 		let optionString = ' -m';
 		let mPosition = suffix.indexOf(optionString);
 
-		common.debug('mPosition: ' + mPosition);
+		client.logger.debug('mPosition: ' + mPosition);
 
-		let dateString = mPosition > -1 ? suffix.substring(0, mPosition) : suffix;
-		let taskString = mPosition > -1 ? suffix.substring(mPosition + 1 + optionString.length) : '';
+		let dateString, taskString;
 
-		common.debug('dateString: ' + dateString);
-		common.debug('taskString: ' + taskString);
+		if (mPosition > -1) {
+			dateString = suffix.substring(0, mPosition);
+			taskString = suffix.substring(mPosition + 1 + optionString.length);
+		} else {
+			dateString = suffix;
+			taskString = '';
+		}
+
+		client.logger.debug('dateString: ' + dateString);
+		client.logger.debug('taskString: ' + taskString);
 
 		let embed = new Discord.RichEmbed();
 
@@ -38,40 +48,41 @@ let commandReminderAdd = new SubCommand('add', argumentValues.REQUIRED)
 			embed.setColor(colors.RED)
 				.setTitle('Missing task!')
 				.setDescription('You provided the `-m` option, but it\'s missing a task.');
-			msg.channel.send({ embed: embed })
+			channel.send({ embed: embed })
 				.then(message => message.delete(5000));
 			return false;
 		}
 
 		let date = chrono.parseDate(dateString, new Date());
-		common.debug('Parsed date: ' + date);
+		client.logger.debug('Parsed date: ' + date);
 
 		if (date == null) {
 			embed.setColor(colors.RED)
 				.setTitle('Invalid time/date input!')
 				.setDescription('`' + dateString + '` could not be converted into a usable timestamp.');
-			msg.channel.send({ embed: embed })
+			channel.send({ embed: embed })
 				.then(message => message.delete(5000));
 			return false;
-		}
+		};
 		let msgLink = msg.getLink();
 		let tempText = 'I will remind you about [this message](<' + msgLink + '>) on ' + date + '.' +
 			(taskString.length > 0 ? '\n> ' + taskString : '');
 		embed.setColor(colors.GREEN)
 			.setTitle('Reminder set!')
 			.setDescription(tempText);
-		if (msg.channel.type !== 'dm') {
-			embed.setFooter('React to this message with ' + common.REMINDER_SIGNUP_EMOJI + ' if you would also like to be reminded');
+		if (channel.type !== 'dm') {
+			embed.setFooter('React to this message with ' + REMINDER_SIGNUP_EMOJI + ' if you would also like to be reminded');
 		}
-		let messagePromise = msg.channel.send({ embed: embed });
+		let messagePromise = channel.send({ embed: embed });
 		messagePromise.then(botMsg => {
 			let reminder = new Reminder(msg, date, taskString, botMsg);
-			common.addReminder(reminder);
-			reminder.start();
+			reminderHandler.add(reminder);
+			reminderHandler.start(reminder);
 		});
-		if (msg.channel.type !== 'dm') {
+
+		if (channel.type !== 'dm') {
 			messagePromise.then(message => {
-				message.react(common.REMINDER_SIGNUP_EMOJI).catch(console.error);
+				message.react(REMINDER_SIGNUP_EMOJI).catch(console.error);
 			});
 		}
 	});
@@ -80,8 +91,11 @@ let commandReminderAdd = new SubCommand('add', argumentValues.REQUIRED)
 let commandReminderRemoveAll = new SubCommand('all', argumentValues.NONE)
 	.addDoc('', 'Remove all of your reminders.')
 	.setExecute(msg => {
+		let client = msg.client;
+		let reminderHandler = client.reminderHandler;
+
 		let user = msg.author;
-		let userReminders = common.getRemindersOfUser(user);
+		let userReminders = reminderHandler.getRemindersOfUser(user);
 		if (userReminders.size === 0) {
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.RED)
@@ -92,7 +106,9 @@ let commandReminderRemoveAll = new SubCommand('all', argumentValues.NONE)
 			return false;
 		}
 
-		let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => { common.leaveAllReminders(user) }, {
+		let confirmationHandler = new ConfirmationMessageHandler(client, msg.channel, () => {
+			client.reminderHandler.leaveAll(user);
+		}, {
 			users : [ user ],
 			initialDesc : 'You are about to leave all of your (' + userReminders.size + ') reminders.',
 			initialTitle : 'Are you sure?',
@@ -108,6 +124,9 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 	.addDoc('<#>', 'Remove the reminder with list #<#>.')
 	.addSub(commandReminderRemoveAll)
 	.setExecute((msg, suffix) => {
+		let client = msg.client;
+		let reminderHandler = client.reminderHandler;
+
 		let user = msg.author;
 		let embed = new Discord.RichEmbed();
 		if (isNaN(suffix)) {
@@ -125,7 +144,7 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 			return false;
 		}
 		let reminderIndex = parseInt(suffix, 10);
-		let simpleReminders = common.getRemindersOfUser(user).simplify();
+		let simpleReminders = reminderHandler.getRemindersOfUser(user).simplify();
 		let reminder;
 		if (!simpleReminders.has(reminderIndex)) {
 			embed.setColor(colors.RED)
@@ -138,7 +157,7 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 
 		let reminderString = '#' + reminderIndex + (reminder.task.length > 0 ? ' (' + reminder.task + ')' : '') + ' set for ' + reminder.date;
 
-		let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => {
+		let confirmationHandler = new ConfirmationMessageHandler(client, msg.channel, () => {
 			if (!reminder.removeUser(user)) {
 				embed.setColor(colors.RED)
 					.setTitle('Oops!')
@@ -158,39 +177,42 @@ let commandReminderRemove = new SubCommand('remove', argumentValues.REQUIRED)
 	});
 
 
-let commandReminderList = new SubCommand('list', argumentValues.NONE)
+let commandReminderListHandler = new SubCommand('list', argumentValues.NONE)
 	.addDoc('', 'List all of your reminders.')
 	.setExecute(async msg => {
 		let user = msg.author;
-		let reminderList = new UserReminderList(msg.channel, user, user);
-		await reminderList.build(msg.channel);
+		let ReminderListHandler = new UserReminderListHandler(msg.client, msg.channel, user, user);
+		await ReminderListHandler.build(msg.channel);
 	});
 
 let commandReminderDisplayAll = new SubCommand('all', argumentValues.NONE)
 	.addDoc('', 'Display all reminders of all users.')
 	.setExecute(async msg => {
-		let reminderList = new ReminderList(msg.channel, common.reminders);
-		await reminderList.build(await msg.author.getDmChannel());
+		let client = msg.client;
+		let reminderListHandler = new ReminderListHandler(msg.client, msg.channel, client.reminderHandler.reminders);
+		await reminderListHandler.build(await msg.author.getDmChannel());
 	});
 
 let commandReminderDisplay = new SubCommand('display', argumentValues.REQUIRED, permissionLevels.BOT_SUPERUSER)
 	.addDoc('<user>', 'Display all reminders of a user.')
 	.addSub(commandReminderDisplayAll)
 	.setExecute(async (msg, suffix) => {
-		let users = common.client.users;
+		let client = msg.client;
+		let users = client.getUsers();
 		let mentions = msg.mentions;
 		let user;
 		if (users.has(suffix)) user = users.get(suffix);
 		else if (mentions.users.size > 0) user = msg.mentions.users.first();
 		else throw 'WRONG';
-		let reminderList = new UserReminderList(msg.channel, user, msg.author);
-		await reminderList.build(await msg.author.getDmChannel());
+		let author = msg.author;
+		let reminderListHandler = new UserReminderListHandler(client, msg.channel, user, author);
+		await reminderListHandler.build(await author.getDmChannel());
 	});
 
 let commandReminder = new Command('reminder', argumentValues.NULL)
 	.addSub(commandReminderAdd)
 	.addSub(commandReminderRemove)
-	.addSub(commandReminderList)
+	.addSub(commandReminderListHandler)
 	.addSub(commandReminderDisplay);
 
 module.exports = commandReminder;

@@ -1,10 +1,9 @@
-const common = require('../common');
-const { Discord, chrono, Config } = common;
+const Discord = require.main.require('./discordjs_amends');
 
-const Command = require('../class/Command');
+const classes = require.main.require('./class');
+const { Command } = classes;
 
-// IMPORT ALL ENUMS
-const enums = require('../enum');
+const enums = require.main.require('./enum');
 
 let commandEval = new Command('eval', enums.argumentValues.REQUIRED, enums.permissionLevels.BOT_OWNER)
     .addDoc(
@@ -12,7 +11,8 @@ let commandEval = new Command('eval', enums.argumentValues.REQUIRED, enums.permi
         'Runs javascript code. Only available to the owner of the bot.' + '\n' +
         '**ATTENTION: POWERFUL COMMAND, CAN AFFECT FILES BEYOND THE BOT\'S ROOT DIRECTORY**'
     ).setExecute((msg, suffix) => {
-        if (msg.author.id === Config.ownerId) {
+        let client = msg.client;
+        if (msg.author.id === client.config.ownerId) {
             let out = eval(suffix);
             if (out) {
                 let embed = new Discord.RichEmbed()

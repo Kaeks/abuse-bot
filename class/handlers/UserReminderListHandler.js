@@ -1,12 +1,15 @@
-const common = require('../common');
-const ReminderList = require('./ReminderList');
+const Discord = require.main.require('./discordjs_amends');
+const util = require.main.require('./util');
 
-class UserReminderList extends ReminderList {
+const ReminderListHandler = require.main.require('./class/handlers/ReminderListHandler');
+
+class UserReminderListHandler extends ReminderListHandler {
+	
 	user;
 	issuer;
 
-	constructor(channel, user, issuer) {
-		super(channel, common.getRemindersOfUser(user));
+	constructor(client, channel, user, issuer) {
+		super(client, channel, client.reminderHandler.getRemindersOfUser(user));
 		this.user = user;
 		this.issuer = issuer;
 	}
@@ -37,4 +40,4 @@ class UserReminderList extends ReminderList {
 	}
 }
 
-module.exports = UserReminderList;
+module.exports = UserReminderListHandler;

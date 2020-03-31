@@ -1,8 +1,9 @@
-const common = require('../common');
-const Command = require('./Command.js');
+const classes = require.main.require('./class');
+const { Command } = classes;
 
-const argumentValues = require('../enum/ArgumentValueEnum.js');
-const permissionLevels = require('../enum/PermissionLevelEnum.js');
+const enums = require.main.require('./enum');
+const { argumentValues, permissionLevels } = enums;
+
 
 class SubCommand extends Command {
 	parent;

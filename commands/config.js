@@ -1,31 +1,29 @@
-const common = require('../common');
-const {
-	Discord,
-	Config, saveConfig,
-} = common;
+const Discord = require.main.require('./discordjs_amends');
+const util = require.main.require('./util');
 
-const Command = require('../class/Command');
-const SubCommand = require('../class/SubCommand');
+const classes = require.main.require('./class');
+const { Command, SubCommand } = classes;
 
-const argumentValues = require('../enum/ArgumentValueEnum');
-const permissionLevels = require('../enum/PermissionLevelEnum');
-const colors = require('../enum/EmbedColorEnum');
+const enums = require.main.require('./enum');
+const { argumentValues, permissionLevels, colors } = enums;
 
 let commandConfigPrefix = new SubCommand('prefix', argumentValues.OPTIONAL)
 	.addDoc('', 'View prefix')
 	.addDoc('[newPrefix]', 'Set new prefix')
 	.setExecute((msg, suffix) => {
+		let client = msg.client;
+		let config = client.config;
 		if (suffix == null) {
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.GREEN)
 				.setTitle('Bot prefix')
-				.setDescription('Bot prefix is currently `' + Config.prefix + '`.');
+				.setDescription('Bot prefix is currently `' + config.prefix + '`.');
 			msg.channel.send({ embed: embed });
 		} else {
 			let newPrefix = suffix;
-			Config.prefix = newPrefix;
-			saveConfig();
-			common.updatePresence();
+			config.prefix = newPrefix;
+			client.configHandler.save();
+			client.updatePresence();
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.GREEN)
 				.setTitle('Bot prefix set!')
@@ -38,17 +36,19 @@ let commandConfigDebug = new SubCommand('debug', argumentValues.OPTIONAL)
 	.addDoc('', 'View debug logging.')
 	.addDoc('[true|false]', 'Enable/disable debug logging.')
 	.setExecute((msg, suffix) => {
+		let client = msg.client;
+		let config = client.config;
 		if (suffix == null) {
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.GREEN)
 				.setTitle('Debug mode')
-				.setDescription('`debug` is set to `' + Config.debug + '`.');
+				.setDescription('`debug` is set to `' + config.debug + '`.');
 			msg.channel.send({ embed: embed });
 		} else {
-			let boolValue = common.getBooleanValue(suffix);
-			if (!common.testBooleanValue(msg, boolValue)) return false;
-			Config.debug = boolValue;
-			saveConfig();
+			let boolValue = util.getBooleanValue(suffix);
+			if (!util.testBooleanValue(msg, boolValue)) return false;
+			config.debug = boolValue;
+			client.configHandler.save();
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.GREEN)
 				.setTitle('Debug mode set!')
@@ -61,17 +61,19 @@ let commandConfigProfanityFilter = new SubCommand('profanityfilter', argumentVal
 	.addDoc('', 'View status of the profanity filter.')
 	.addDoc('[true|false]', 'Enable/disable the profanity filter.')
 	.setExecute((msg, suffix) => {
+		let client = msg.client;
+		let config = client.config;
 		if (suffix == null) {
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.GREEN)
 				.setTitle('Profanity filter')
-				.setDescription('The value for the profanity filter is set to `' + Config.badWordFilter + '`.');
+				.setDescription('The value for the profanity filter is set to `' + config.badWordFilter + '`.');
 			msg.channel.send({ embed: embed });
 		} else {
-			let boolValue = common.getBooleanValue(suffix);
-			if (!common.testBooleanValue(msg, boolValue)) return false;
-			Config.badWordFilter = boolValue;
-			saveConfig();
+			let boolValue = util.getBooleanValue(suffix);
+			if (!util.testBooleanValue(msg, boolValue)) return false;
+			config.badWordFilter = boolValue;
+			client.configHandler.save();
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.GREEN)
 				.setTitle('Profanity filter set!')

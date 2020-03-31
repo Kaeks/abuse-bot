@@ -1,527 +1,90 @@
 //// SETUP
 // GLOBAL IMPORTS
-const CronJob = require('cron').CronJob;
-const Discord = require('discord.js');
+const Discord = require('./discordjs_amends');
 const client = new Discord.Client();
-const chrono = require('chrono-node');
+const fs = require('fs');
 
-const enums = require('./enum');
-const { argumentValues, colors, reactionEvents, permissionLevels, roleNames } = enums;
+client.logger = require('./modules/Logger');
+client.commands = new Discord.Collection();
 
-/// EXPORTS
-module.exports = {
-	Discord, chrono, client
-};
-
-// IMPORTS
-const common = require('./common');
+const handlers = require('./class/handlers');
 const {
-	fs,
-	Config, Storage, Blocked, Deleted, Edited,
-	saveData, saveBlocked, saveDeleted, saveEdited,
-	updatePresence,
-	sendWednesday
-} = common;
+	FileHandler, WednesdayHandler,
+	ReminderHandler, CustomFunctionHandler,
+	WaterHandler, ReactionListenerHandler,
+	DumpHandler, ConfigHandler, DataHandler
+} = handlers;
+
+client.fileHandler = new FileHandler(client);
+
+client.configHandler = new ConfigHandler(client, './config.json');
+client.configHandler.load();
+
+// CONSTANTS
+const STORAGE_DIR = client.config.devMode ? './storage/dev/' : './storage/';
+
+// STORAGE FILE PATHS
+client.paths = {
+	DATA:			STORAGE_DIR + 'data.json',
+	BLOCKED:		STORAGE_DIR + 'blocked_users.json',
+	DELETED:		STORAGE_DIR + 'deleted_messages.json',
+	EDITED:			STORAGE_DIR + 'edited_messages.json',
+	REMINDER:		STORAGE_DIR + 'reminders.json',
+	CUSTOM_FUNC:	STORAGE_DIR + 'custom_functions.json'
+}
+
+client.dataHandler = new DataHandler(client, client.paths.DATA);
+
+client.blockedUsers = client.fileHandler.load(client.paths.BLOCKED);
+client.deletedMessages = client.fileHandler.load(client.paths.DELETED);
+client.editedMessages = client.fileHandler.load(client.paths.EDITED);
+
+client.wednesdayHandler = new WednesdayHandler(client);
+client.reminderHandler = new ReminderHandler(client, client.paths.REMINDER);
+client.customFunctionHandler = new CustomFunctionHandler(client, client.paths.CUSTOM_FUNC);
+client.waterHandler = new WaterHandler(client);
+client.reactionListenerHandler = new ReactionListenerHandler(client);
+client.dumpHandler = new DumpHandler(client);
+
+client.dataHandler.load();
+
+require('./modules/functions')(client);
+
+//// AMENDS
+Number.prototype.pad = function(size) {
+	let s = String(this);
+	while (s.length < (size || 2)) s = '0' + s;
+	return s;
+};
 
 // Catch UnhandledPromiseRejection
 process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection', error));
 
-const COMMAND_DIRECTORY = './commands';
+const init = async () => {
 
-client.commands = new Discord.Collection();
-const commandFiles = fs.readdirSync(COMMAND_DIRECTORY).filter(file => file.match(/.js$/));
-for (const file of commandFiles) {
-	const command = require(COMMAND_DIRECTORY + '/' + file);
-	client.commands.set(command.name, command);
-}
+	// BAD WORDS
+	const specialChars = '[ ^°"$%&/()=?{}\\[\\]\\\\`´*+~#\'\\-_.:,;<>|]';
+	const badWords = fs.readFileSync('./storage/badwords.txt', 'utf-8').split(/\r\n?|\n/).join('|');
 
-// BAD WORDS
-let badWordsText = fs.readFileSync('./storage/badwords.txt', 'utf-8');
-let badWords = badWordsText.split(/\r\n?|\n/);
+	client.badWordsRegExp = new RegExp('(?<=^|' + specialChars + ')(' + badWords + ')(?=$|' + specialChars + ')');
 
-let specialChars = '[ ^°"$%&/()=?{}\\[\\]\\\\`´*+~#\'\\-_.:,;<>|]';
-let joinedBadWords = badWords.join('|');
-let badWordsRegExp = new RegExp('(?<=^|' + specialChars + ')(' + joinedBadWords + ')(?=$|' + specialChars + ')');
-
-//// EVENTS
-// START
-client.on('ready', async () => {
-	// Initial "Hello world!"
-	console.log('*hacker voice* I\'m in.');
-	console.log(`Agent ${client.user.username} signing in.`);
-	updatePresence();
-
-	let now = new Date();
-	common.log(now.toString());
-
-	// Data
-	for (const guildEntry of client.guilds) {
-		let guild = guildEntry[1];
-		await setUpServer(guild);
+	const commandFiles = fs.readdirSync('./commands').filter(file => file.match(/.js$/));
+	for (const file of commandFiles) {
+		const command = require('./commands' + '/' + file);
+		client.commands.set(command.name, command);
 	}
+	
+	client.login(client.config.devMode ? client.config.devToken : client.config.token).catch(console.error);
 
-	// WATER SETUP
-	common.loadWaterTimers();
-	common.startAllWaterTimers();
-
-	// REMINDER SETUP
-	await common.loadReminders();
-	common.filterReminders();
-	common.startAllReminders();
-
-	// CUSTOM FUNCTION SETUP
-	common.loadCustomFunctions();
-});
-
-// MESSAGE
-client.on('message', handleMessage);
-
-// MESSAGE DELETED
-client.on('messageDelete', message => {
-	// Discard messages created by bots
-	if (message.author.bot) return false;
-	// Discard messages that were commands (and thus deleted by the bot)
-	if (isCommand(message)) return false;
-
-	common.log('Message by ' + message.author + ' deleted.');
-	let shortened = {
-		id: message.id,
-		content: message.content,
-		author: {
-			id: message.author.id,
-			username: message.author.username,
-			discriminator: message.author.discriminator
-		},
-		channel: {
-			type: message.channel.type,
-			id: message.channel.id,
-		}
-	};
-	if (message.embeds.length > 0) {
-		shortened.embeds = 'yes';
-	}
-	if (message.attachments.size > 0) {
-		let shortenedAttachments = [];
-		message.attachments.forEach(function(value) {
-			shortenedAttachments.push(
-				{
-					id: value.id,
-					filename: value.filename,
-					url: value.url,
-					proxyURL: value.proxyURL
-				}
-			);
-		});
-		shortened.attachments = shortenedAttachments;
-	}
-	Deleted.push(shortened);
-	saveDeleted();
-});
-
-// MESSAGE UPDATED
-client.on('messageUpdate', (oldMessage, newMessage) => {
-	if (oldMessage.author.bot) {
-		// discard messages created by bots
-		return false;
-	}
-	common.log('Message by ' + oldMessage.author + ' edited.');
-	let combinedEntry = {
-		id: oldMessage.id,
-		type: oldMessage.type,
-		oldContent: oldMessage.content,
-		newContent: newMessage.content,
-		author: {
-			id: oldMessage.author.id,
-			username: oldMessage.author.username,
-			discriminator: oldMessage.author.discriminator
-		},
-		channel: {
-			type: oldMessage.channel.type,
-			id: oldMessage.channel.id,
-		}
-	};
-	Edited.push(combinedEntry);
-	saveEdited();
-});
-
-function handleReaction(messageReaction, user, event) {
-	if (user.bot) return false;
-	let message = messageReaction.message;
-
-	let listeners = common.reactionListeners;
-	listeners.forEach(listener => {
-		// Check if the message is being listened to and the reaction is accepted
-		if (message.id === listener.msgId) {
-			if (listener.reactions.includes(messageReaction.emoji.name)) {
-				listener.fn(messageReaction, user, event);
-			}
-		}
-	});
-}
-
-// REACTION ADDED TO MESSAGE
-client.on('messageReactionAdd', (messageReaction, user) => {
-	handleReaction(messageReaction, user, reactionEvents.ADD);
-});
-
-// REACTION REMOVED FROM MESSAGE
-client.on('messageReactionRemove', ((messageReaction, user) => {
-	handleReaction(messageReaction, user, reactionEvents.REMOVE);
-}));
-
-// ADDED TO SERVER
-client.on('guildCreate', async guild => {
-	common.log('Joined server \'' + guild.name + '\'.');
-	await setUpServer(guild);
-});
-
-// REMOVED FROM SERVER
-client.on('guildDelete', guild => {
-	common.log('Whoa whoa whoa I just got kicked from ' + guild.name);
-});
-
-//// CRON
-// WEDNESDAY
-let wednesdayCronJob = new CronJob('0 0 * * 3', async function() {
-	for (let serverEntry in Storage.servers) {
-		if (!Storage.servers.hasOwnProperty(serverEntry)) continue;
-		let cur = Storage.servers[serverEntry];
-		if (!cur.channels.hasOwnProperty('wednesday')) continue;
-		if (cur.disabledFeatures.wednesday !== true) {
-			let channelEntry = cur.channels.wednesday;
-			let channel = client.channels.get(channelEntry);
-			sendWednesday(channel);
-		}
-	}
-	for (let userEntry in Storage.users) {
-		if (!Storage.users.hasOwnProperty(userEntry)) continue;
-		let cur = Storage.users[userEntry];
-		if (cur.hasOwnProperty('wednesday')) continue;
-		if (cur.wednesday === true) {
-			let user = client.users.get(userEntry);
-			let channel = await user.getDmChannel();
-			sendWednesday(channel);
-		}
-	}
-}, null, true, 'Europe/Berlin');
-
-//// METHODS
-/**
- * Looks for a role with a specific name on a server
- * @param server
- * @param {String} roleName
- * @return {*}
- */
-function findServerRoleFromName(server, roleName) {
-	return server.roles.find(role => role.name === roleName);
-}
-
-/**
- * Looks for an existing Wiktor server owner role
- * @param server
- * @return {*}
- */
-function findServerOwnerRole(server) {
-	return findServerRoleFromName(server, roleNames.SERVER_OWNER);
-}
-
-/**
- * Looks for an existing Wiktor server superuser role
- * @param server
- * @return {*}
- */
-function findServerSuperUserRole(server) {
-	return findServerRoleFromName(server, roleNames.SERVER_SUPERUSER);
-}
-
-/**
- * Sets up database space for a server
- * @param server
- */
-async function setUpServer(server) {
-	if (!Storage.servers.hasOwnProperty(server.id)) {
-		Storage.servers[server.id] = {};
-		common.log('Added \'' + server.name + '\' to server list.');
-	}
-	let serverEntry = Storage.servers[server.id];
-	if (!serverEntry.hasOwnProperty('channels')) {
-		serverEntry.channels = {};
-		common.log('Added \'channels\' property to \'' + server.name + '\'.');
-	}
-	if (!serverEntry.hasOwnProperty('roles')) {
-		serverEntry.roles = {};
-		common.log('Added \'roles\' property to \'' + server.name + '\'.');
-	}
-	if (!serverEntry.roles.hasOwnProperty('owner')) {
-		let role;
-		let foundRole = findServerOwnerRole(server);
-		if (foundRole !== undefined && foundRole != null) {
-			role = foundRole;
-		} else {
-			try {
-				role = await server.createRole({
-					name : roleNames.SERVER_OWNER,
-					color : 'GREY',
-					mentionable : false
-				}, 'Wiktor Bot per-server permission system role setup.');
-			} catch(e) {
-				// error
-				console.error();
-			}
-		}
-		if (role !== undefined) {
-			serverEntry.roles.owner = role.id;
-			common.log('Added server owner role to \'' + server.name + '\'.');
-		}
-	}
-	if (!serverEntry.roles.hasOwnProperty('superuser')) {
-		let role;
-		let foundRole = findServerSuperUserRole(server);
-		if (foundRole !== undefined && foundRole != null) {
-				role = foundRole;
-		} else {
-			try {
-				role = await server.createRole({
-					name : roleNames.SERVER_SUPERUSER,
-					color : 'GREY',
-					mentionable : false
-				}, 'Wiktor Bot per-server permission system role setup.');
-			} catch (e) {
-				// error
-				console.error(e);
-			}
-		}
-		if (role !== undefined) {
-			serverEntry.roles.superuser = role.id;
-			common.log('Added server superuser role to \'' + server.name + '\'.');
-		}
-	}
-	if (!serverEntry.hasOwnProperty('disabledFeatures')) {
-		serverEntry.disabledFeatures = [];
-		common.log('Added \'disabledFeatures\' property to \'' + server.name + '\'.');
-	}
-	saveData();
-}
-
-/**
- * Sets up database space for a user
- * @param msg
- * @param user
- */
-function setUpUser(msg, user) {
-	if (!Storage.users.hasOwnProperty(user.id)) {
-		common.log('Added \'' + user + '\' to user list.');
-		Storage.users[user.id] = {};
-	}
-	Storage.users[user.id].wednesday = Storage.users[user.id].wednesday || {};
-	Storage.users[user.id].water = Storage.users[user.id].water || {};
-	msg.channel.send(
-		`Hey, ${user}! This seems to be your first time interacting with me. ` +
-		`Make sure to enable DMs from users on this server to be able to receive personal messages used for a variety of my functions.`
-	);
-	saveData();
-}
-
-/**
- * Handles an incoming message
- * @param msg
- */
-function handleMessage(msg) {
-	if (msg.author === common.getOwner() && msg.content === 'wiktor pls crash') throw JSON.stringify({a:0,b:1,c:2});
-	if (msg.author === client.user) return;
-	if (isCommand(msg)) {
-		let executedCommand = handleCommand(msg);
-		if (msg.channel.type === 'dm' || msg.channel.type === 'group') return;
-		if (msg.guild.me.permissions.has('MANAGE_MESSAGES') && (executedCommand === null || executedCommand.delete === true)) {
-				msg.delete(5000);
-		}
-		return;
-	}
-	// Message is not a command, handle non-command interactions
-	let eatAss = msg.content.match(/(?:^|[\s])((eat\sass)|(eat\s.*\sass))(?=\s|$)/i);
-	let ummah = msg.content.match(/u((mah+)|(m{2,}ah*))/i);
-	if (msg.mentions.everyone) {
-		msg.channel.send("@everyone? Really? @everyone? Why would you ping @everyone, " + msg.author + "?");
-		return;
-	}
-	let saidBadWord = msg.content.match(badWordsRegExp);
-	if (msg.isMentioned(client.user) || msg.channel.type === 'dm') {
-		if (ummah) {
-			if (eatAss) {
-				msg.channel.send('Gladly, ' + msg.author + ' UwU');
-			} else {
-				msg.channel.send(msg.author + ' :kiss:');
-			}
-		} else if (eatAss) {
-			msg.channel.send('Hey, ' + msg.author + ', how about you eat mine?');
-		} else if (saidBadWord) {
-			msg.channel.send('No u, ' + msg.author + '.');
-		} else if (msg.isMentioned(client.user)) {
-			msg.channel.send('wassup ' + msg.author);
-		}
-	} else {
-		if (eatAss) {
-			msg.channel.send('Hey, ' + msg.author + ', that\'s not very nice of you!');
-		} else if (Config.badWordFilter === true && saidBadWord) {
-			msg.channel.send('Whoa there buddy. Mind your language, ' + msg.author + ', there\'s kids around!')
-		}
-	}
-}
-
-//// COMMAND HANDLING
-/**
- * Returns whether or not a user is blocked from using bot features.
- * @param user
- * @returns {boolean}
- */
-function isBlocked(user) {
-	return Blocked.includes(user.id);
-}
-
-/**
- * Returns whether or not a message is to be handled as a command by the bot.
- * @param msg
- * @returns {boolean} success
- */
-function isCommand(msg) {
-	// Check whether the message was issued by another user
-	if (msg.author === client.user) return false;
-	// Check whether the message starts with the bot's prefix
-	if (!msg.content.startsWith(Config.prefix)) return false;
-
-	const split = msg.content.slice(Config.prefix.length).split(/ +/);
-	const commandName = split[0].toLowerCase();
-	return client.commands.has(commandName);
-}
-
-/**
- * Get the name of the command in the message.
- * @param {*} msg
- */
-function getCommandName(msg) {
-	const split = msg.content.slice(Config.prefix.length).split(/ +/);
-	return split[0].toLowerCase();
-}
-
-/**
- * Recursive function to execute a command - sub-command chain
- * @param msg
- * @param suffix
- * @param command
- * @returns {Command} the executed subCommand
- */
-function findSubCommand(msg, suffix, command) {
-	// Variable for determining whether a (sub-)command can be executed with the suffix or not
-	let isValidUse = false;
-
-	if (suffix == null) {
-		// Suffix is empty
-		// Command doesn't require arguments ✔
-		// Command doesn't have a standalone function ✔
-		if (![argumentValues.REQUIRED, argumentValues.NULL].includes(command.args)) isValidUse = true;
-	} else {
-		// Suffix is not empty
-		// Get a list of individual (possible) sub-commands
-		let splitList = suffix.split(/ +/);
-		let firstArg = splitList[0];
-
-		// If there is a sub-command, go through to it and look recursively
-		// If there is no sub-command and the current command accepts / requires arguments, continue with execution
-		if (command.sub.has(firstArg)) {
-			let temp = suffix.substring(firstArg.length);
-			let match = temp.match(/ +/);
-			let subCommand = command.sub.get(firstArg);
-
-			let user = msg.author;
-
-			if (user.getPermissionLevel(msg) < subCommand.permissionLevel) {
-				common.debug('User ' + user.getHandle() + ' does not have the required permission level for that sub-command.');
-				msg.channel.send('I\'m sorry, ' + user + ', you do not have permission to execute that sub-command.');
-				return null;
-			}
-
-			let newSuffix = match !== null ? temp.substring(match[0].length) : null;
-
-			return findSubCommand(msg, newSuffix, subCommand);
-		} else if (command.args === argumentValues.REQUIRED || command.args === argumentValues.OPTIONAL) {
-			isValidUse = true;
-		}
-	}
-
-	// If the use is valid, execute it
-	// If the use is not valid, display help
-	let commandString = common.combineCommandChain(command.getCommandChain());
-	if (isValidUse) {
-		let suffixString = suffix == null ? '' : ' with suffix: \'' + suffix + '\'';
-		common.log('User ' + msg.author.getHandle() + ' issued command \'' + commandString + '\'' + suffixString + '.');
-		if (command.hasOwnProperty('execute')) {
-			command.execute(msg, suffix);
-			return command;
-		} else {
-			common.warn('Command \'' + commandString + '\' has not been implemented.');
-			let embed = new Discord.RichEmbed()
-				.setColor(colors.RED)
-				.setTitle('Not available!')
-				.setDescription('The command `' + Config.prefix + commandString + '` doesn\'t have an implemented function.');
-			msg.channel.send({ embed: embed });
-			return null;
-		}
-	} else {
-		let embed = new Discord.RichEmbed()
-			.setColor(colors.GREEN)
-			.setTitle('Help for ' + commandString);
-		embed.setDescription(common.getCommandHelp(command));
-		msg.channel.send({ embed: embed });
-	}
-	return null;
-}
-
-/**
- * Handles a command inside a message
- * @param msg
- * @returns {Command} the executed command
- */
-function handleCommand(msg) {
-	let user = msg.author;
-	// Filter out blocked users
-	if (isBlocked(user)) {
-		common.debug('User ' + user.getHandle() + ' is on blocked user list.');
-		msg.channel.send('I\'m sorry, ' + user + ', you\'ve been blocked from using me.');
-		return null;
-	}
-
-	// Create database space for the message author
-	if (!Storage.users.hasOwnProperty(user.id)) setUpUser(msg, user);
-
-	const commandName = getCommandName(msg);
-	common.debug('commandName: ' + commandName);
-	const command = client.commands.get(commandName);
-
-	let commandPermissionLevel = command.permissionLevel || permissionLevels.NONE;
-
-	if (user.getPermissionLevel(msg) < commandPermissionLevel) {
-		common.debug('User ' + user.getHandle() + ' does not have the required permission level for that command.');
-		msg.channel.send('I\'m sorry, ' + user + ', you do not have permission to execute that command.');
-		return null;
-	}
-
-	let temp = msg.content.substring(Config.prefix.length + commandName.length);
-	let match = temp.match(/ +/);
-
-	const suffix = match !== null ? temp.substring(match[0].length) : null;
-	common.debug('suffix: ' + suffix);
-	try {
-		return findSubCommand(msg, suffix, command);
-	} catch (e) {
-		console.error(e.stack);
-		let embed = new Discord.RichEmbed()
-			.setColor(colors.RED)
-			.setTitle('Internal Error!')
-			.setDescription('Command `' + commandName + '` failed.');
-		msg.channel.send({ embed: embed });
-	}
-	return null;
+	const evtFiles = fs.readdirSync('./events');
+  	client.logger.log(`Loading a total of ${evtFiles.length} events.`);
+  	evtFiles.forEach(file => {
+    	const eventName = file.split(".")[0];
+    	client.logger.log(`Loading Event: ${eventName}`);
+    	const event = require(`./events/${file}`);
+    	client.on(eventName, event.bind(null, client));
+  	});
 }
 
 //// ENTRY POINT
-client.login(Config.devMode ? Config.devToken : Config.token).catch(console.error);
+init();

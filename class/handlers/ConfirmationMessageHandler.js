@@ -1,10 +1,11 @@
-const common = require('../common');
-const { Discord } = common;
-const enums = require('../enum');
+const Discord = require.main.require('./discordjs_amends');
 
-const MessageHandler = require('./MessageHandler');
+const MessageHandler = require.main.require('./class/handlers/MessageHandler');
 
+const enums = require.main.require('./enum');
 const { colors, timeSpans, confirmationEmojis } = enums;
+
+const PREF_CONFIRMATION_EMOJI_BASE = '👌';
 
 class ConfirmationMessageHandler extends MessageHandler {
 
@@ -14,13 +15,8 @@ class ConfirmationMessageHandler extends MessageHandler {
 	initialEmbed;
 	timeoutEmbed;
 
-	/**
-	 * @param {Discord.Channel} channel
-	 * @param confirmFunction
-	 * @param options
-	 */
-	constructor(channel, confirmFunction, options) {
-		super(channel);
+	constructor(client, channel, confirmFunction, options) {
+		super(client, channel);
 		this.confirmFunction = confirmFunction ? confirmFunction : () => {};
 
 		options.users = options.users || [];

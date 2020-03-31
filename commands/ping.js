@@ -1,10 +1,10 @@
-const common = require('../common');
-const { Discord } = common;
+const Discord = require.main.require('./discordjs_amends');
 
-const Command = require('../class/Command');
+const classes = require.main.require('./class');
+const { Command } = classes;
 
-const argumentValues = require('../enum/ArgumentValueEnum');
-const colors = require('../enum/EmbedColorEnum');
+const enums = require.main.require('./enum');
+const { argumentValues, colors } = enums;
 
 let commandPing = new Command('ping', argumentValues.NONE)
 	.addDoc('', 'Pong?')

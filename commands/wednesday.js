@@ -1,24 +1,19 @@
-const common = require('../common');
-const {
-	Discord,
-	Storage, saveData,
-	sendWednesday
-} = common;
+const Discord = require.main.require('./discordjs_amends');
+const util = require.main.require('./util');
 
-const Command = require('../class/Command.js');
-const SubCommand = require('../class/SubCommand.js');
+const classes = require.main.require('./class');
+const { Command, SubCommand } = classes;
 
-const argumentValues = require('../enum/ArgumentValueEnum');
-const permissionLevels = require('../enum/PermissionLevelEnum');
-const serverFeatures = require('../enum/ServerFeatureEnum');
-const colors = require('../enum/EmbedColorEnum');
+const enums = require.main.require('./enum');
+const { argumentValues, permissionLevels, serverFeatures, colors } = enums;
 
 let commandWednesdayEnable = new SubCommand('enable', argumentValues.NONE)
 	.addDoc('', 'Enable wednesday posting.')
 	.setExecute(msg => {
 		if (checkDmOrGroup(msg)) return false;
 		let server = msg.guild;
-		server.enableFeature(serverFeatures.WEDNESDAY);
+		let client = msg.client;
+		client.enableServerFeature(server, serverFeatures.WEDNESDAY);
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.GREEN)
 			.setTitle('Wednesday posting enabled!')
@@ -31,7 +26,8 @@ let commandWednesdayDisable = new SubCommand('disable', argumentValues.NONE)
 	.setExecute((msg) => {
 		if (checkDmOrGroup(msg)) return false;
 		let server = msg.guild;
-		server.disableFeature(serverFeatures.WEDNESDAY);
+		let client = msg.client;
+		client.disableServerFeature(server, serverFeatures.WEDNESDAY);
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.GREEN)
 			.setTitle('Wednesday posting disabled!')
@@ -43,6 +39,7 @@ let commandWednesdayChannelSet = new SubCommand('set', argumentValues.OPTIONAL, 
 	.addDoc('[textChannel]', 'Set channel for Wednesdays.')
 	.setExecute((msg, suffix) => {
 		if (checkDmOrGroup(msg)) return false;
+		let client = msg.client;
 		let server = msg.guild;
 		let channel;
 		if (suffix == null) {
@@ -50,9 +47,9 @@ let commandWednesdayChannelSet = new SubCommand('set', argumentValues.OPTIONAL, 
 		} else {
 			channel = msg.mentions.channels.first();
 		}
-		Storage.servers[server.id].channels = Storage.servers[server.id].channels || {};
-		Storage.servers[server.id].channels.wednesday = channel.id;
-		saveData();
+		client.data.servers[server.id].channels = client.data.servers[server.id].channels || {};
+		client.data.servers[server.id].channels.wednesday = channel.id;
+		client.dataHandler.save();
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.GREEN)
 			.setTitle('Wednesday channel set!')
@@ -65,9 +62,10 @@ let commandWednesdayChannel = new SubCommand('channel', argumentValues.NONE)
 	.addSub(commandWednesdayChannelSet)
 	.setExecute(msg => {
 		if (checkDmOrGroup(msg)) return false;
+		let client = msg.client;
 		let server = msg.guild;
-		let channelEntry = Storage.servers[server.id].channels.wednesday;
-		let channel = msg.client.channels.get(channelEntry);
+		let channelEntry = client.data.servers[server.id].channels.wednesday;
+		let channel = client.channels.get(channelEntry);
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.GREEN)
 			.setTitle('Current wednesday channel')
@@ -78,16 +76,17 @@ let commandWednesdayChannel = new SubCommand('channel', argumentValues.NONE)
 let commandWednesdaySubscribe = new SubCommand('subscribe', argumentValues.NONE)
 	.addDoc('', 'Subscribe to the private Wednesday service.')
 	.setExecute(msg => {
+		let client = msg.client;
 		let user = msg.author;
-		if (isSubscribed(user)) {
+		if (isSubscribed(client, user)) {
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.GREEN)
 				.setTitle('Already subscribed!')
 				.setDescription('You are already subscribed to the private Wednesday service ' + user + '.');
 			msg.channel.send({embed : embed});
 		} else {
-			Storage.users[user.id].wednesday = true;
-			saveData();
+			client.data.users[user.id].wednesday = true;
+			client.dataHandler.save();
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.GREEN)
 				.setTitle('Subscribed!')
@@ -99,10 +98,11 @@ let commandWednesdaySubscribe = new SubCommand('subscribe', argumentValues.NONE)
 let commandWednesdayUnsubscribe = new SubCommand('unsubscribe', argumentValues.NONE)
 	.addDoc('', 'Unsubscribe from the private Wednesday service.')
 	.setExecute(msg => {
+		let client = msg.client;
 		let user = msg.author;
-		if (isSubscribed(user)) {
-			Storage.users[user.id].wednesday = false;
-			saveData();
+		if (isSubscribed(client, user)) {
+			client.data.users[user.id].wednesday = false;
+			client.dataHandler.save();
 			let embed = new Discord.RichEmbed()
 				.setColor(colors.GREEN)
 				.setTitle('Unsubscribed!')
@@ -120,16 +120,17 @@ let commandWednesdayUnsubscribe = new SubCommand('unsubscribe', argumentValues.N
 let commandWednesdayTest = new SubCommand('now', argumentValues.NONE, permissionLevels.BOT_SUPERUSER)
 	.addDoc('', 'It is Wednesday, my dudes.')
 	.setExecute(msg => {
-		sendWednesday(msg.channel);
+		util.sendWednesday(msg.channel);
 	});
 
 let commandWednesdayNow = new SubCommand('test', argumentValues.NONE, permissionLevels.BOT_SUPERUSER)
 	.addDoc('', 'Simulate a Wednesday.')
 	.setExecute(async msg => {
+		let client = msg.client;
 		let user = msg.author;
 		if (msg.channel.type === 'dm' || msg.channel.type === 'group') {
-			if (isSubscribed(user)) {
-				sendWednesday(await user.getDmChannel());
+			if (isSubscribed(client, user)) {
+				util.sendWednesday(await user.getDmChannel());
 			} else {
 				let embed = new Discord.RichEmbed()
 					.setColor(colors.GREEN)
@@ -140,11 +141,11 @@ let commandWednesdayNow = new SubCommand('test', argumentValues.NONE, permission
 		}
 		if (msg.channel.type === 'text') {
 			let server = msg.guild;
-			if (Storage.servers[server.id].channels.hasOwnProperty('wednesday')) {
-				if (Storage.servers[server.id].disabledFeatures.wednesday !== true) {
-					let channelEntry = Storage.servers[server.id].channels.wednesday;
+			if (client.data.servers[server.id].channels.hasOwnProperty('wednesday')) {
+				if (client.data.servers[server.id].disabledFeatures.wednesday !== true) {
+					let channelEntry = client.data.servers[server.id].channels.wednesday;
 					let channel = msg.client.channels.get(channelEntry);
-					sendWednesday(channel);
+					util.sendWednesday(channel);
 				} else {
 					let embed = new Discord.RichEmbed()
 						.setColor(colors.GREEN)
@@ -179,8 +180,8 @@ module.exports = commandWednesday;
  * @param user
  * @returns {boolean}
  */
-function isSubscribed(user) {
-	let userEntry = Storage.users[user.id];
+function isSubscribed(client, user) {
+	let userEntry = client.data.users[user.id];
 	userEntry = userEntry || {};
 	userEntry.wednesday = userEntry.wednesday || false;
 	return userEntry.wednesday === true;

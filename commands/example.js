@@ -1,8 +1,8 @@
-const Command = require('../class/Command.js');
-const SubCommand = require('../class/SubCommand.js');
+const classes = require.main.require('./class');
+const { Command, SubCommand } = classes;
 
-const argumentValues = require('../enum/ArgumentValueEnum');
-const permissionLevels = require('../enum/PermissionLevelEnum');
+const enums = require.main.require('./enum');
+const { argumentValues, permissionLevels } = enums;
 
 let commandExampleA = new SubCommand('a', argumentValues.NONE)
 	.addDoc('', 'Example sub-command that doesn\'t accept parameters.')

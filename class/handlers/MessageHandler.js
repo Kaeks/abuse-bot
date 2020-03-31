@@ -1,14 +1,16 @@
-const common = require('../common');
+const Discord = require.main.require('./discordjs_amends');
 
-const { Discord } = common;
+const ClientBasedHandler = require.main.require('./class/handlers/ClientBasedHandler');
 
-class MessageHandler {
+class MessageHandler extends ClientBasedHandler {
 
 	id;
 	channel;
 	message;
 
-	constructor(channel) {
+	constructor(client, channel) {
+		super(client);
+		
 		this.channel = channel;
 		this.id = Discord.SnowflakeUtil.generate();
 	}

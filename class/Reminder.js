@@ -1,10 +1,10 @@
-const common = require('../common');
-const { Discord, client } = common;
-let { reminders } = common;
+const Discord = require.main.require('./discordjs_amends');
+const util = require.main.require('./util');
 
-const { reactionEvents, colors } = require('../enum');
+const { colors } = require.main.require('./enum');
 
 class Reminder {
+
 	id;
 	users;
 	userMsg;
@@ -19,74 +19,6 @@ class Reminder {
 		this.botMsg = botMsg;
 		this.date = date;
 		this.task = task;
-
-		common.addReminder(this);
-	}
-
-	/**
-	 * Stops the reminder timer
-	 */
-	stop() {
-		if (!common.runningReminders.has(this.id)) {
-			common.info('Timer of reminder with id ' + this.id + ' was not running.');
-			return false;
-		}
-		let timerEntry = common.runningReminders.get(this.id);
-		clearInterval(timerEntry);
-		common.runningReminders.delete(this.id);
-		common.debug('Stopped timer of reminder with id ' + this.id + '.');
-		return true;
-	}
-
-	/**
-	 * Deletes the reminder
-	 */
-	delete() {
-		this.stop();
-		reminders.delete(this.id);
-		common.saveReminders();
-		common.debug('Deleted reminder with id ' + this.id + '.');
-	}
-
-	/**
-	 * Triggers the reminder
-	 */
-	trigger() {
-		this.users.forEach(user => {
-			this.send(user)
-				.catch(console.error);
-		});
-		common.debug('Triggered reminder with id ' + this.id + '.');
-		this.delete();
-		common.saveReminders();
-	}
-
-	/**
-	 * Recursive running function to handle times larger than the 32-bit signed positive integer limit in milliseconds
-	 * @param {Date} started
-	 */
-	runTimer(started = new Date()) {
-		let me = this;
-		let now = new Date();
-		let future = new Date(this.date);
-		let diff = future - now;
-		if (diff < 0) {
-			common.info('Reminder with id ' + this.id + ' has its starting point in the past. Deleting.');
-			this.delete();
-			return false;
-		}
-		let timer;
-		if (diff > 0x7FFFFFFF) {
-			timer = setTimeout(function() {
-				me.runTimer(started);
-			});
-		} else {
-			timer = setTimeout(function() {
-				me.trigger();
-			}, diff);
-		}
-		common.runningReminders.set(this.id, timer);
-		return true;
 	}
 
 	/**
@@ -108,44 +40,6 @@ class Reminder {
 	}
 
 	/**
-	 * Starts the reminder timer
-	 * @returns {boolean}
-	 */
-	async start() {
-		if (!this.runTimer()) {
-			common.info('Reminder with id ' + this.id + ' could not be started.');
-			return false;
-		}
-		common.debug('Started reminder with id ' + this.id + '.');
-
-		if (this.botMsg == null) {
-			common.info('Reminder with id ' + this.id + ' doesn\'t have a bot message.');
-			return true;
-		}
-
-		let channel = client.channels.get(this.botMsg.channel.id);
-		let botMsg;
-		try {
-			botMsg = await channel.fetchMessage(this.botMsg.id);
-		} catch (e) {
-			common.info('Could not fetch bot message of reminder with id ' + this.id + '.');
-			this.botMsg = null;
-			reminders.set(this.id, this);
-			common.saveReminders();
-			return true;
-		}
-		common.addReactionListener(botMsg, (messageReaction, reactor, event) => {
-			if (event === reactionEvents.ADD) {
-				this.addUser(reactor);
-			} else if (event === reactionEvents.REMOVE) {
-				this.removeUser(reactor);
-			}
-		}, [ common.REMINDER_SIGNUP_EMOJI ]);
-		common.debug('Added listener to bot message of reminder with id ' + this.id + '.');
-		return true;
-	}
-
-	/**
 	 * Adds a user to the list of users of this reminder
 	 * @param user
 	 * @return {boolean} success
@@ -153,8 +47,6 @@ class Reminder {
 	addUser(user) {
 		if (this.users.includes(user)) return false;
 		this.users.push(user);
-		common.saveReminders();
-		common.log(user + ' joined reminder ' + this.id + '.');
 		return true;
 	}
 
@@ -168,8 +60,6 @@ class Reminder {
 		this.users = this.users.filter(userEntry => {
 			return userEntry !== user;
 		});
-		common.saveReminders();
-		common.log(user + ' left reminder ' + this.id + '.');
 		return true;
 	}
 
@@ -195,9 +85,26 @@ class Reminder {
 	 */
 	getSingleLine(listPosition) {
 		let positionString = ' **#' + listPosition + '**';
-		let linkString = '[' + common.parseDate(this.date) + '](<' + this.userMsg.getLink() + '>)';
+		let linkString = '[' + util.parseDate(this.date) + '](<' + this.userMsg.getLink() + '>)';
 		let taskString = this.task.length > 0 ? '\n> ' + this.task : '';
 		return positionString + ' ' + linkString + taskString;
+	}
+
+	trigger() {
+		this.users.forEach(user => {
+			this.send(user).catch(console.error);
+		});
+	}
+
+	format() {
+		return {
+			id : this.id,
+			users : this.users.map(val => val.id),
+			userMsg : this.userMsg.format(),
+			botMsg : this.botMsg != null ? this.botMsg.format() : null,
+			date : this.date,
+			task : this.task
+		};
 	}
 }
 

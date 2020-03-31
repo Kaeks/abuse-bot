@@ -1,29 +1,25 @@
+const Discord = require.main.require('./discordjs_amends');
 const { inspect } = require('util');
 
-const common = require('../common');
-const { Discord, Config } = common;
+const classes = require.main.require('./class');
+const { Command, SubCommand, CustomFunction, handlers } = classes;
+const { ConfirmationMessageHandler } = handlers;
 
-const Command = require('../class/Command');
-const SubCommand = require('../class/SubCommand');
-const CustomFunction = require('../class/CustomFunction');
-
-const ConfirmationMessageHandler = require('../class/ConfirmationMessageHandler');
-
-// IMPORT ALL ENUMS
-const enums = require('../enum');
+const enums = require.main.require('./enum');
 const { argumentValues, permissionLevels, colors } = enums;
 
 let commandCustomAdd = new SubCommand('add', argumentValues.REQUIRED)
 	.addDoc('<name> <function>', 'Add a custom function.')
 	.setExecute((msg, suffix) => {
+		let client = msg.client;
 		let user = msg.author;
 		let name = suffix.split(/ +/)[0];
 		let temp = suffix.substring(name.length);
 		let match = temp.match(/ +/);
 		let fn = match !== null ? temp.substring(match[0].length) : null;
-		if (common.customFunctions.has(name)) {
+		if (client.customFunctionHandler.customFunctions.has(name)) {
 
-			let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => {
+			let confirmationHandler = new ConfirmationMessageHandler(client, msg.channel, () => {
 				createCustomFunctionEntry(msg, name, fn, user);
 			}, {
 				users : [ user ],
@@ -42,11 +38,12 @@ let commandCustomAdd = new SubCommand('add', argumentValues.REQUIRED)
 let commandCustomList = new SubCommand('list', argumentValues.NONE)
 	.addDoc('', 'List all custom functions.')
 	.setExecute(msg => {
+		let client = msg.client;
 		let description = '';
 
-		common.customFunctions.forEach(customFunction => {
+		client.customFunctionHandler.customFunctions.forEach(customFunction => {
 			description += `**${customFunction.name}** - ${customFunction.creator.getHandle()}\nCreated on ${customFunction.date}.`;
-			if (customFunction !== common.customFunctions.last()) {
+			if (customFunction !== client.customFunctionHandler.customFunctions.last()) {
 				description += '\n';
 			}
 		});
@@ -61,7 +58,8 @@ let commandCustomList = new SubCommand('list', argumentValues.NONE)
 let commandCustomRemoveAll = new SubCommand('all', argumentValues.NONE)
 	.addDoc('', 'Remove all custom functions.')
 	.setExecute(msg => {
-		if (common.customFunctions.size === 0) {
+		let client = msg.client;
+		if (client.customFunctionHandler.customFunctions.size === 0) {
 			let foundNoneEmbed = new Discord.RichEmbed()
 				.setColor(colors.RED)
 				.setTitle('No custom functions!')
@@ -70,8 +68,8 @@ let commandCustomRemoveAll = new SubCommand('all', argumentValues.NONE)
 		}
 		let user = msg.author;
 
-		let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => {
-			if (!common.deleteAllCustomFunctions()) {
+		let confirmationHandler = new ConfirmationMessageHandler(client, msg.channel, () => {
+			if (!client.customFunctionHandler.deleteAll()) {
 				let errorEmbed = new Discord.RichEmbed()
 					.setColor(colors.RED)
 					.setTitle('Oops!')
@@ -94,7 +92,8 @@ let commandCustomRemove = new SubCommand('remove', argumentValues.REQUIRED)
 	.addDoc('<name>', 'Remove a custom function.')
 	.addSub(commandCustomRemoveAll)
 	.setExecute((msg, suffix) => {
-		if (!common.customFunctions.has(suffix)) {
+		let client = msg.client;
+		if (!client.customFunctionHandler.customFunctions.has(suffix)) {
 			let notFoundEmbed = new Discord.RichEmbed()
 				.setColor(colors.RED)
 				.setTitle('Not found!')
@@ -104,10 +103,10 @@ let commandCustomRemove = new SubCommand('remove', argumentValues.REQUIRED)
 		}
 
 		let user = msg.author;
-		let customFunction = common.customFunctions.get(suffix);
+		let customFunction = client.customFunctionHandler.customFunctions.get(suffix);
 
-		let confirmationHandler = new ConfirmationMessageHandler(msg.channel, () => {
-			if (!customFunction.delete()) {
+		let confirmationHandler = new ConfirmationMessageHandler(client, msg.channel, () => {
+			if (!client.customFunctionHandler.delete(customFunction)) {
 				let errorEmbed = new Discord.RichEmbed()
 					.setColor(colors.RED)
 					.setTitle('Oops!')
@@ -127,11 +126,12 @@ let commandCustomRemove = new SubCommand('remove', argumentValues.REQUIRED)
 	});
 
 let commandCustomExecute = new SubCommand('execute', argumentValues.REQUIRED)
-	.addDoc('name', 'Execute a custom function.')
+	.addDoc('<name>', 'Execute a custom function.')
 	.setExecute(async (msg, suffix) => {
-		if (common.customFunctions.has(suffix)) {
+		let client = msg.client;
+		if (client.customFunctionHandler.customFunctions.has(suffix)) {
 			try {
-				let result = await common.customFunctions.get(suffix).execute(msg);
+				let result = await client.customFunctionHandler.customFunctions.get(suffix).execute(msg);
 				let successEmbed = new Discord.RichEmbed()
 					.setColor(colors.PRESTIGE)
 					.setTitle('Custom function result!')
@@ -163,7 +163,7 @@ module.exports = commandCustom;
 
 function createCustomFunctionEntry(msg, name, fn, creator) {
 	let customFunction = new CustomFunction(name, fn, creator);
-	common.addCustomFunction(customFunction);
+	msg.client.customFunctionHandler.add(customFunction);
 	let createdEmbed = new Discord.RichEmbed()
 		.setColor(colors.PRESTIGE)
 		.setTitle('Created custom function!')
