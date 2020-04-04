@@ -35,6 +35,6 @@ module.exports = (client, message) => {
 		});
 		shortened.attachments = shortenedAttachments;
 	}
-	Deleted.push(shortened);
+	client.deletedMessages.push(shortened);
     client.fileHandler.save(client.paths.DELETED, client.deletedMessages);
 }

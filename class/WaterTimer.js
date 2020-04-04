@@ -1,5 +1,4 @@
 const Discord = require.main.require('./discordjs_amends');
-const util = require.main.require('./util');
 
 const enums = require.main.require('./enum');
 const { colors } = enums;
@@ -51,6 +50,7 @@ class WaterTimer {
 	 * @returns {Promise<boolean>}
 	 */
 	async sendApology(missedIntervals) {
+		let client = this.user.client;
 		let embed = new Discord.RichEmbed()
 			.setColor(colors.RED)
 			.setTitle('Sorry!')
