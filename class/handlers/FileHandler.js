@@ -51,6 +51,11 @@ class FileHandler extends ClientBasedHandler {
         }
     }
 
+    createIfNotExists(filePath, value) {
+        if (this.exists(filePath)) return;
+        this.save(filePath, value);
+    }
+
 }
 
 module.exports = FileHandler;

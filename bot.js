@@ -35,6 +35,10 @@ client.paths = {
 
 client.dataHandler = new DataHandler(client, client.paths.DATA);
 
+client.fileHandler.createIfNotExists(client.paths.BLOCKED, []);
+client.fileHandler.createIfNotExists(client.paths.DELETED, []);
+client.fileHandler.createIfNotExists(client.paths.EDITED, []);
+
 client.blockedUsers = client.fileHandler.load(client.paths.BLOCKED);
 client.deletedMessages = client.fileHandler.load(client.paths.DELETED);
 client.editedMessages = client.fileHandler.load(client.paths.EDITED);
