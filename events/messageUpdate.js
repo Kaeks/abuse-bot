@@ -3,6 +3,10 @@ module.exports = (client, oldMessage, newMessage) => {
 		// discard messages created by bots
 		return false;
 	}
+	if (oldMessage.content === newMessage.content) {
+		// discard messages that were "edited" but did not change their text content
+		return false;
+	}
 	client.logger.log('Message by ' + oldMessage.author + ' edited.');
 	let combinedEntry = {
 		id: oldMessage.id,
